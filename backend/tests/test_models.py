@@ -24,16 +24,19 @@ def test_optical_flow_motion():
     assert "speed_kmh" in motion
     assert 0.0 <= motion["direction_deg"] <= 360.0
 
-def test_convgru_residual_inference():
+def test_convgru_residual_inference_untrained_fails_safely():
+    """Verify that when no checkpoint is present, ConvGRU refuses random weights and reports untrained."""
+    assert not convgru_nowcaster.is_trained
+    assert convgru_nowcaster.model_status == "not_trained"
+    
     ts = satellite_service.get_available_timestamps()
     f0 = satellite_service.read_frame(ts[0])
     f1 = satellite_service.read_frame(ts[1])
     flow = optical_flow_model.compute_dense_flow(f0["convective_intensity"], f1["convective_intensity"])
     
-    residual = convgru_nowcaster.predict_residual(f0["convective_intensity"], f1["convective_intensity"], flow)
-    assert residual.shape == f1["convective_intensity"].shape
-    # Bounded residual
-    assert np.max(np.abs(residual)) <= 0.35
+    # Must raise RuntimeError rather than silently using random weights
+    with pytest.raises(RuntimeError, match="TRAINED MODEL NOT AVAILABLE"):
+        convgru_nowcaster.predict_residual(f0["convective_intensity"], f1["convective_intensity"], flow)
 
 def test_multi_horizon_forecasting():
     ts = satellite_service.get_available_timestamps()

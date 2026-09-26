@@ -53,20 +53,9 @@ def get_sensor_status():
         "provenance_badge": "YELLOW: PROTOTYPE / PROXY REDUCED SENSOR FUSION"
     }
 
+from backend.app.services.model_loader import model_loader_service
+
 @router.get("/model-info")
 def get_model_info():
-    return {
-        "model_version": "convnowcast-v0.1",
-        "architecture": {
-            "primary": "ConvGRU Residual Network (Learned Growth/Decay Residuals)",
-            "baseline_1": "Lagrangian Persistence (Zero-Motion Advection)",
-            "baseline_2": "OpenCV Farneback Dense Optical Flow Advection",
-            "fusion": "Final = clamp(Optical_Flow + ConvGRU_Residual, 0, 1)"
-        },
-        "horizons": {
-            "fine_scale": ["+15 min", "+30 min", "+60 min"],
-            "probabilistic_corridors": ["+180 min (3h)", "+360 min (6h)"]
-        },
-        "uncertainty_calibration": "Temperature Scaling & Conformal Prediction Intervals",
-        "provenance": "Trained & evaluated on historical INSAT-3D convective storm event (07-NOV-2019 Bay of Bengal Severe Storm Bulbul)"
-    }
+    """Returns model status, checkpoint, metadata, and device information."""
+    return model_loader_service.get_model_info()

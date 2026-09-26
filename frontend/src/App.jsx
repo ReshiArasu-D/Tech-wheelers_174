@@ -17,6 +17,7 @@ export default function App() {
   const [stormState, setStormState] = useState(null);
   const [selectedHorizon, setSelectedHorizon] = useState('NOW');
   const [selectedModel, setSelectedModel] = useState('CONVGRU');
+  const [modelInfo, setModelInfo] = useState(null);
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -28,8 +29,12 @@ export default function App() {
     lightning: 'unavailable'
   });
 
-  // 1. Initial Load: Fetch Events & Available Timestamps
+  // 1. Initial Load: Fetch Events, Timestamps & Model Status
   useEffect(() => {
+    api.getModelInfo()
+      .then(info => setModelInfo(info))
+      .catch(err => console.error("Error loading model info:", err));
+
     api.getEvents().then((evList) => {
       setEvents(evList);
       if (evList.length > 0) {
@@ -154,6 +159,7 @@ export default function App() {
             onSelectModel={handleSelectModel}
             selectedHorizon={selectedHorizon}
             onSelectHorizon={setSelectedHorizon}
+            modelInfo={modelInfo}
             uncertaintyMetrics={stormState?.uncertainty}
           />
 

@@ -139,16 +139,21 @@ class ForecastingPipeline:
         )
 
         # 14. Unified Storm State JSON
+        model_is_trained = convgru_nowcaster.is_trained
+        model_status_label = "TRAINED" if model_is_trained else "TRAINED MODEL NOT AVAILABLE"
         storm_state = {
             "event_id": "EVENT-20191107-BOB-01",
             "timestamp": timestamp,
             "model_version": "convnowcast-v0.1",
+            "model_status": convgru_nowcaster.model_status,
+            "is_convgru_trained": model_is_trained,
             "provenance_badge": {
                 "prototype": "INSAT + ERA5 Historical Replay",
                 "production": "DWR + INSAT + Lightning + ERA5",
-                "model": f"{model_override} + Optical Flow Advection",
+                "model": f"{model_override} ({model_status_label})" if model_override == "CONVGRU" else model_override,
                 "version": "convnowcast-v0.1",
-                "grid_resolution": "3.7 km native INSAT / 1.0 km radar-anchored target"
+                "grid_resolution": "3.7 km native INSAT / 1.0 km radar-anchored target",
+                "checkpoint_status": model_status_label
             },
             "sensor_status": {
                 "insat": sensors["insat"],
