@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.env
+*.db
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data (large files)
+backend/data/raw/*.h5
+backend/models/*.pt
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Kaggle cache
+.cache/
