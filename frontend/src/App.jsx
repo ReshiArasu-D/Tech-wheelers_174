@@ -76,7 +76,7 @@ export default function App() {
 
   // ── 1. WebSocket Live Stream ───────────────────────────────────────────────
   useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/live';
+    const wsUrl = import.meta.env.VITE_WS_URL || (import.meta.env.PROD ? 'wss://now-casr.onrender.com/ws/live' : 'ws://localhost:8000/ws/live');
     let socket;
     try {
       socket = new WebSocket(wsUrl);

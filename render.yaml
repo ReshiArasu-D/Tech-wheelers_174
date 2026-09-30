@@ -28,9 +28,8 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: co-nowcast-backend
-          property: host
+        value: https://now-casr.onrender.com
+      - key: VITE_WS_URL
+        value: wss://now-casr.onrender.com/ws/live
       - key: VITE_MAPTILER_API_KEY
         value: ehLkmAaIGPEMafg5WhXy
