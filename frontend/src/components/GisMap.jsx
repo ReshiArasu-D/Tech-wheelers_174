@@ -5,7 +5,48 @@ import { api } from '../services/api';
 
 const TERLS_LAT = 8.5241;
 const TERLS_LON = 76.9366;
-const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_API_KEY || 'ehLkmAaIGPEMafg5WhXy';
+
+// High-resolution Satellite Hybrid style (ESRI photorealistic satellite + Carto labels)
+// Works globally on localhost, Render, and custom domains with ZERO 403 blocks or key restrictions
+const SATELLITE_HYBRID_STYLE = {
+  version: 8,
+  sources: {
+    'esri-satellite': {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+      ],
+      tileSize: 256,
+      attribution: 'Esri, Maxar, Earthstar Geographics'
+    },
+    'carto-labels': {
+      type: 'raster',
+      tiles: [
+        'https://basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png'
+      ],
+      tileSize: 256
+    }
+  },
+  layers: [
+    {
+      id: 'esri-satellite-layer',
+      type: 'raster',
+      source: 'esri-satellite',
+      minzoom: 0,
+      maxzoom: 19
+    },
+    {
+      id: 'carto-labels-layer',
+      type: 'raster',
+      source: 'carto-labels',
+      minzoom: 0,
+      maxzoom: 19,
+      paint: {
+        'raster-opacity': 0.85
+      }
+    }
+  ]
+};
 
 export default function GisMap({
   storms = [],
@@ -40,7 +81,7 @@ export default function GisMap({
       : storms;
   }, [dwrFrameData, storms]);
 
-  // ── 1. Initialize MapLibre with MapTiler Satellite Hybrid ──────────────────
+  // ── 1. Initialize MapLibre with High-Resolution Satellite Hybrid ───────────
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
@@ -48,7 +89,7 @@ export default function GisMap({
     try {
       map = new Map({
         container: mapContainerRef.current,
-        style: `https://api.maptiler.com/maps/hybrid/style.json?key=${MAPTILER_KEY}`,
+        style: SATELLITE_HYBRID_STYLE,
         center: [TERLS_LON + 0.3, TERLS_LAT + 0.8],
         zoom: 7.2,
         pitch: is3D ? 35 : 0,
@@ -56,7 +97,7 @@ export default function GisMap({
         attributionControl: false,
       });
     } catch (e) {
-      console.error('[GisMap] MapTiler Satellite Hybrid error:', e);
+      console.error('[GisMap] Satellite Hybrid init error:', e);
       setInitError(String(e));
       return;
     }
@@ -1081,7 +1122,7 @@ export default function GisMap({
           gap: 6
         }}>
           <span style={{ fontSize: '11px', fontWeight: 600, color: '#0F172A' }}>
-            MapTiler Satellite Hybrid
+            Satellite Hybrid (3D Terrain)
           </span>
           <span style={{ fontSize: '9px', color: '#64748B' }}>▾</span>
         </div>
