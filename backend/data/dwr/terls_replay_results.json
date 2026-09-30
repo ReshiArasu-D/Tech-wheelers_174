@@ -1,0 +1,257 @@
+{
+  "metadata": {
+    "dataset": "ISRO TERLS C-band DWR",
+    "event_date": "2019-11-07",
+    "num_scans": 20,
+    "num_sequences": 15,
+    "input_shape": [
+      15,
+      5,
+      3,
+      128,
+      128
+    ],
+    "target_shape": [
+      15,
+      128,
+      128
+    ],
+    "input_channels": [
+      "DBZ",
+      "VEL",
+      "validity_mask"
+    ],
+    "target": "next-frame reflectivity",
+    "spatial_size": [
+      128,
+      128
+    ],
+    "sequence_length": 5,
+    "training_mode": "INDIAN_FROM_SCRATCH",
+    "best_validation_loss": 0.00015586147492285818,
+    "final_validation_loss": 0.00015586147492285818,
+    "checkpoint": "/content/drive/MyDrive/SIH_NOWCAST/data/dwr/radar_convgru_india_20191107.pt"
+  },
+  "checkpoint": "D:\\now cast\\backend\\models\\radar\\radar_convgru_india_20191107.pt",
+  "sha256": "da5609c9083386674cbe80570e3b7b15234edf9a551921a3eb549ca1074c6e7d",
+  "total_params": 30369,
+  "timestamps": [
+    "2019-11-07T03:00:00Z",
+    "2019-11-07T03:10:00Z",
+    "2019-11-07T03:20:00Z",
+    "2019-11-07T03:30:00Z",
+    "2019-11-07T03:40:00Z",
+    "2019-11-07T03:50:00Z",
+    "2019-11-07T04:00:00Z",
+    "2019-11-07T04:10:00Z",
+    "2019-11-07T04:20:00Z",
+    "2019-11-07T04:30:00Z",
+    "2019-11-07T04:40:00Z",
+    "2019-11-07T04:50:00Z",
+    "2019-11-07T05:00:00Z",
+    "2019-11-07T05:10:00Z",
+    "2019-11-07T05:20:00Z"
+  ],
+  "num_sequences": 15,
+  "sequences_ok": 15,
+  "first_ts": "2019-11-07T03:00:00Z",
+  "last_ts": "2019-11-07T05:20:00Z",
+  "mock_data": false,
+  "sequences": [
+    {
+      "seq_idx": 0,
+      "timestamp": "2019-11-07T03:00:00Z",
+      "status": "OK",
+      "dbz_max": 0.056,
+      "dbz_mean": -0.021623,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 1,
+      "timestamp": "2019-11-07T03:10:00Z",
+      "status": "OK",
+      "dbz_max": 0.0247,
+      "dbz_mean": -0.021644,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 2,
+      "timestamp": "2019-11-07T03:20:00Z",
+      "status": "OK",
+      "dbz_max": 0.0417,
+      "dbz_mean": -0.021579,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 3,
+      "timestamp": "2019-11-07T03:30:00Z",
+      "status": "OK",
+      "dbz_max": 0.0226,
+      "dbz_mean": -0.021592,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 4,
+      "timestamp": "2019-11-07T03:40:00Z",
+      "status": "OK",
+      "dbz_max": 0.0475,
+      "dbz_mean": -0.021585,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 5,
+      "timestamp": "2019-11-07T03:50:00Z",
+      "status": "OK",
+      "dbz_max": 0.0633,
+      "dbz_mean": -0.021494,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 6,
+      "timestamp": "2019-11-07T04:00:00Z",
+      "status": "OK",
+      "dbz_max": 0.0707,
+      "dbz_mean": -0.021493,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 7,
+      "timestamp": "2019-11-07T04:10:00Z",
+      "status": "OK",
+      "dbz_max": 0.0784,
+      "dbz_mean": -0.021407,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 8,
+      "timestamp": "2019-11-07T04:20:00Z",
+      "status": "OK",
+      "dbz_max": 0.0978,
+      "dbz_mean": -0.021336,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 9,
+      "timestamp": "2019-11-07T04:30:00Z",
+      "status": "OK",
+      "dbz_max": 0.0866,
+      "dbz_mean": -0.021339,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 10,
+      "timestamp": "2019-11-07T04:40:00Z",
+      "status": "OK",
+      "dbz_max": 0.1317,
+      "dbz_mean": -0.021218,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 11,
+      "timestamp": "2019-11-07T04:50:00Z",
+      "status": "OK",
+      "dbz_max": 0.119,
+      "dbz_mean": -0.020957,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 12,
+      "timestamp": "2019-11-07T05:00:00Z",
+      "status": "OK",
+      "dbz_max": 0.1566,
+      "dbz_mean": -0.02092,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 13,
+      "timestamp": "2019-11-07T05:10:00Z",
+      "status": "OK",
+      "dbz_max": 0.155,
+      "dbz_mean": -0.020614,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    },
+    {
+      "seq_idx": 14,
+      "timestamp": "2019-11-07T05:20:00Z",
+      "status": "OK",
+      "dbz_max": 0.1498,
+      "dbz_mean": -0.020362,
+      "shape": [
+        128,
+        128
+      ],
+      "is_real": true,
+      "mock_data": false
+    }
+  ]
+}

@@ -50,18 +50,31 @@ class HorizonForecastSchema(BaseModel):
 
 class SingleHazardSchema(BaseModel):
     hazard_type: str
-    severity: str # "NONE", "LOW", "MODERATE", "HIGH", "SEVERE"
-    probability: float
-    proxy_indicator: str
-    scientific_label: str
-    affected_area_km2: float
+    severity: str # "NONE", "LOW", "MODERATE", "HIGH", "SEVERE", "UNAVAILABLE"
+    probability: Optional[float] = None  # None for UNAVAILABLE hazards (e.g. Downburst)
+    confidence: Optional[str] = None
+    uncertainty: Optional[float] = None
+    horizon_minutes: Optional[int] = None
+    name: Optional[str] = None
+    proxy_indicator: Optional[str] = None
+    scientific_label: Optional[str] = None
+    scientific_basis: Optional[str] = None
+    provenance: Optional[str] = None
+    model_status: Optional[str] = None
+    spatial_field: Optional[Dict[str, Any]] = None
+    # Legacy fields
+    affected_area_km2: Optional[float] = None
     grid_geojson: Optional[Dict[str, Any]] = None
+
+    model_config = {"extra": "allow"}  # allow extra fields from service
 
 class MultiHazardSchema(BaseModel):
     lightning: SingleHazardSchema
+    thunderstorm: Optional[SingleHazardSchema] = None
     hail: SingleHazardSchema
-    downburst: SingleHazardSchema
+    heavy_rain: Optional[SingleHazardSchema] = None
     cloudburst: SingleHazardSchema
+    downburst: SingleHazardSchema
 
 class UncertaintyMetricsSchema(BaseModel):
     calibration_method: str = "Temperature Scaling & Conformal Prediction Intervals"
@@ -133,7 +146,12 @@ class PredictFrameRequest(BaseModel):
     timestamp: str
     sensor_override: Optional[Dict[str, str]] = None
     model_override: Optional[str] = "CONVGRU" # PERSISTENCE, OPTICAL_FLOW, CONVGRU
+    radar_data: Optional[Dict[str, Any]] = None
 
 class ApproveAlertRequest(BaseModel):
     operator_name: str = "Chief Duty Meteorologist"
     comments: Optional[str] = "Alert verified against convective cell intensification and trajectory corridor."
+
+class RejectAlertRequest(BaseModel):
+    operator_name: str = "Chief Duty Meteorologist"
+    reason: Optional[str] = "Operator rejected: convective dissipation or false alarm signature."

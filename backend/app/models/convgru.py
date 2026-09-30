@@ -17,10 +17,12 @@ import cv2
 from typing import Dict, List, Tuple, Optional, Any
 
 from backend.app.services.model_loader import model_loader_service, ConvGRUResidualNetwork
+from backend.app.services.model_registry import model_registry
 
 class ConvGRUNowcaster:
     def __init__(self):
         self.loader = model_loader_service
+        self.registry = model_registry
 
     @property
     def is_trained(self) -> bool:
@@ -193,6 +195,12 @@ class ConvGRUNowcaster:
                         }
                     })
 
+                long_horizon_loaded = self.registry.is_loaded("long_horizon_decoder")
+                long_model_used = (
+                    "LongHorizonDecoder (Trained Checkpoint)"
+                    if long_horizon_loaded
+                    else "Probabilistic Dispersion Corridor (Awaiting Colab long_horizon_decoder_KTLX.pt)"
+                )
                 forecast_results[f"{hz}m"] = {
                     "horizon_minutes": hz,
                     "target_timestamp": target_ts,
@@ -203,8 +211,9 @@ class ConvGRUNowcaster:
                     "storm_polygons": [],
                     "probabilistic_contours": [],
                     "corridors": corridors,
-                    "model_used": model_used,
-                    "is_convgru_trained": convgru_trained
+                    "model_used": long_model_used,
+                    "is_convgru_trained": convgru_trained,
+                    "is_long_horizon_trained": long_horizon_loaded
                 }
 
         return forecast_results

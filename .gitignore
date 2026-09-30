@@ -22,9 +22,28 @@ frontend/dist/
 *.swp
 *.swo
 
-# Data (large files)
-backend/data/raw/*.h5
-backend/models/*.pt
+# Data & Models (tracked for deployment)
+# backend/data/raw/*.h5 and backend/models/*.pt are intentionally tracked
+
+# Temporary & Large Download Artifacts
+*.zip
+dwr_unzipped/
+screenshot_*.png
+backend/data/insat/
+
+# Scratch & Analysis Scripts
+audit_*.py
+capture_*.py
+capture_*.cjs
+examine_*.py
+find_*.py
+inspect_*.py
+scan_*.py
+test_six_hazards.py
+test_timeline_hazards.py
+run_verification_suite.py
+notebook_analysis.txt
+training_summary.txt
 
 # OS
 .DS_Store

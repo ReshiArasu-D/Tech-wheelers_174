@@ -55,7 +55,9 @@ class RiskEngine:
         primary_threat = "Convective Thunderstorm"
 
         for h_key, h_data in hazards.items():
-            prob = h_data.get("probability", 0.1)
+            prob = h_data.get("probability")
+            if prob is None:
+                continue
             sev = h_data.get("severity", "LOW")
             score = sev_weights.get(sev, 10.0) * prob
             if score > max_haz_score:
@@ -98,8 +100,8 @@ class RiskEngine:
             urgency_component = 3.0
 
         # 4. Persistence & Cell Scale Factor (0 to 15 pts)
-        area = primary_storm["area_km2"]
-        intensity = primary_storm["intensity"]
+        area = primary_storm.get("area_km2", 100.0)
+        intensity = primary_storm.get("intensity", (primary_storm.get("max_dbz", 35.0) / 70.0))
         persistence_component = min(15.0, (area / 15000.0) * 8.0 + intensity * 7.0)
 
         # Composite Risk Score

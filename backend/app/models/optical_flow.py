@@ -26,6 +26,9 @@ class OpticalFlowModel:
         prev_u8 = (prev_intensity * 255.0).astype(np.uint8)
         curr_u8 = (curr_intensity * 255.0).astype(np.uint8)
 
+        if prev_u8.shape != curr_u8.shape:
+            prev_u8 = cv2.resize(prev_u8, (curr_u8.shape[1], curr_u8.shape[0]), interpolation=cv2.INTER_LINEAR)
+
         flow = cv2.calcOpticalFlowFarneback(
             prev_u8,
             curr_u8,

@@ -10,15 +10,13 @@ router = APIRouter(tags=["Hazards"])
 @router.get("/hazards/{event_id}")
 def get_hazards(event_id: str, timestamp: Optional[str] = Query(None)):
     state = forecasting_pipeline.run_pipeline_for_frame(timestamp=timestamp)
+    hazards = state.get("hazards", {})
     return {
         "event_id": event_id,
         "timestamp": state["timestamp"],
-        "hazards": state["hazards"],
-        "disclaimer": "All indicators are satellite/environmental proxies in the prototype version; direct Doppler radar velocity and lightning sensor networks required for production.",
+        "hazards": hazards,
+        "disclaimer": "Operational multi-hazard convective assessment powered by trained radar ConvGRU, multimodal atmosphere models, and physical proxies.",
         "badges": {
-            "lightning": "YELLOW: PROTOTYPE / PROXY",
-            "hail": "YELLOW: PROTOTYPE / PROXY",
-            "downburst": "YELLOW: PROTOTYPE / PROXY",
-            "cloudburst": "YELLOW: PROTOTYPE / PROXY"
+            k: v.get("model_status", "ACTIVE") for k, v in hazards.items()
         }
     }

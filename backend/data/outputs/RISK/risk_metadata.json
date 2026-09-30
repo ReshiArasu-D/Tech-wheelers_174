@@ -1,0 +1,18 @@
+{
+  "event": "KTLX_20240101_development",
+  "samples": 22,
+  "grid": [
+    128,
+    128
+  ],
+  "hazards": [
+    "heavy_rain",
+    "thunderstorm",
+    "hail",
+    "cloudburst"
+  ],
+  "hazard_outputs": "prototype_inference",
+  "exposure": "real_osm_128x128",
+  "risk": "hazard_score_times_osm_exposure",
+  "calibration": "not_operationally_calibrated"
+}

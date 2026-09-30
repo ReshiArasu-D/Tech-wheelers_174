@@ -77,7 +77,13 @@ class ConvGRUResidualNetwork(nn.Module):
 
 
 class ModelLoaderService:
-    CHECKPOINT_FILENAME = "convgru_best.pt"
+    # Candidate checkpoint filenames in priority order.
+    # convgru_best.pt = Colab export; radar_convgru.pt / multimodal_convgru_rain.pt = Drive assets.
+    CHECKPOINT_CANDIDATES = [
+        "convgru_best.pt",
+        "radar_convgru.pt",
+        "multimodal_convgru_rain.pt",
+    ]
     NORMALIZATION_FILENAME = "normalization.json"
     CONFIG_FILENAME = "training_config.json"
     METRICS_FILENAME = "metrics.json"
@@ -85,75 +91,121 @@ class ModelLoaderService:
     def __init__(self, model_dir: Optional[str] = None):
         self.model_dir = model_dir or settings.MODEL_DIR
         self.device = torch.device("cpu")
+
+        # Primary ConvGRU (radar backbone)
         self.model: Optional[ConvGRUResidualNetwork] = None
+        self.checkpoint_filename: str = ""
         self.is_trained: bool = False
         self.status: str = "not_trained"
         self.message: str = "TRAINED MODEL NOT AVAILABLE"
-        
+
+        # Secondary multimodal model (rain-aware head, optional)
+        self.multimodal_model: Optional[ConvGRUResidualNetwork] = None
+        self.multimodal_loaded: bool = False
+
         self.normalization: Optional[Dict[str, Any]] = None
         self.training_config: Optional[Dict[str, Any]] = None
         self.metrics: Optional[Dict[str, Any]] = None
-        
+
         # Attempt to load checkpoint and metadata
         self.reload()
 
     def get_paths(self) -> Dict[str, str]:
+        # Resolve active checkpoint path (whichever candidate was found first)
+        ckpt = self.checkpoint_filename or self.CHECKPOINT_CANDIDATES[0]
         return {
-            "checkpoint": os.path.join(self.model_dir, self.CHECKPOINT_FILENAME),
+            "checkpoint": os.path.join(self.model_dir, ckpt),
             "normalization": os.path.join(self.model_dir, self.NORMALIZATION_FILENAME),
             "training_config": os.path.join(self.model_dir, self.CONFIG_FILENAME),
             "metrics": os.path.join(self.model_dir, self.METRICS_FILENAME)
         }
 
+    def _resolve_checkpoint(self) -> Optional[str]:
+        """Returns the first checkpoint filename that exists in model_dir."""
+        for name in self.CHECKPOINT_CANDIDATES:
+            path = os.path.join(self.model_dir, name)
+            if os.path.exists(path):
+                return name
+        return None
+
+    def _try_load_model(self, ckpt_path: str,
+                        in_channels: int = 5,
+                        hidden_channels: int = 16,
+                        kernel_size: int = 3) -> Optional[ConvGRUResidualNetwork]:
+        """Loads a ConvGRU checkpoint from *ckpt_path*. Returns None on failure."""
+        model = ConvGRUResidualNetwork(
+            in_channels=in_channels,
+            hidden_channels=hidden_channels,
+            kernel_size=kernel_size
+        ).to(self.device)
+
+        loaded = torch.load(ckpt_path, map_location=self.device, weights_only=False)
+        if isinstance(loaded, dict) and "state_dict" in loaded:
+            state_dict = loaded["state_dict"]
+        elif isinstance(loaded, dict) and "model_state_dict" in loaded:
+            state_dict = loaded["model_state_dict"]
+        elif isinstance(loaded, dict):
+            state_dict = loaded
+        else:
+            raise ValueError("Checkpoint does not contain a valid PyTorch state_dict.")
+
+        # Tolerate minor key mismatches (e.g. Colab saved with 'module.' prefix)
+        try:
+            model.load_state_dict(state_dict, strict=True)
+        except RuntimeError:
+            # Strip 'module.' prefix if present (DataParallel saved model)
+            fixed = {k.replace("module.", ""): v for k, v in state_dict.items()}
+            model.load_state_dict(fixed, strict=False)
+
+        model.eval()
+        # Quick validation forward pass
+        with torch.no_grad():
+            dummy = torch.zeros(1, in_channels, 128, 128, device=self.device)
+            res, _ = model(dummy)
+            if res.shape != (1, 1, 128, 128):
+                raise ValueError(f"Unexpected output shape: {res.shape}")
+        return model
+
     def reload(self) -> bool:
         """
-        Scans model_dir for checkpoint and metadata.
+        Scans model_dir for any known checkpoint (priority order:
+        convgru_best.pt → radar_convgru.pt → multimodal_convgru_rain.pt).
         Never generates or uses random weights.
+        Loads multimodal_convgru_rain.pt as a secondary model if available.
         """
-        paths = self.get_paths()
-        ckpt_path = paths["checkpoint"]
-
-        # Check for checkpoint existence
-        if not os.path.exists(ckpt_path):
+        # --- Resolve primary checkpoint ---
+        found_name = self._resolve_checkpoint()
+        if found_name is None:
             self.model = None
             self.is_trained = False
             self.status = "not_trained"
-            self.message = f"TRAINED MODEL NOT AVAILABLE: '{ckpt_path}' not found."
+            candidates = ", ".join(self.CHECKPOINT_CANDIDATES)
+            self.message = f"TRAINED MODEL NOT AVAILABLE: none of [{candidates}] found in '{self.model_dir}'."
             logger.warning(self.message)
             return False
 
-        # Load metadata files if present
-        if os.path.exists(paths["normalization"]):
-            try:
-                with open(paths["normalization"], "r") as f:
-                    self.normalization = json.load(f)
-            except Exception as e:
-                logger.error(f"Error reading normalization.json: {e}")
-                self.normalization = None
-        else:
-            self.normalization = None
+        self.checkpoint_filename = found_name
+        ckpt_path = os.path.join(self.model_dir, found_name)
+        paths = self.get_paths()
 
-        if os.path.exists(paths["training_config"]):
-            try:
-                with open(paths["training_config"], "r") as f:
-                    self.training_config = json.load(f)
-            except Exception as e:
-                logger.error(f"Error reading training_config.json: {e}")
-                self.training_config = None
-        else:
-            self.training_config = None
+        # --- Load optional metadata files ---
+        for attr, fname in [
+            ("normalization", "normalization"),
+            ("training_config", "training_config"),
+            ("metrics", "metrics"),
+        ]:
+            p = paths[fname]
+            if os.path.exists(p):
+                try:
+                    with open(p, "r") as f:
+                        setattr(self, attr, json.load(f))
+                except Exception as e:
+                    logger.error(f"Error reading {os.path.basename(p)}: {e}")
+                    setattr(self, attr, None)
+            else:
+                setattr(self, attr, None)
 
-        if os.path.exists(paths["metrics"]):
-            try:
-                with open(paths["metrics"], "r") as f:
-                    self.metrics = json.load(f)
-            except Exception as e:
-                logger.error(f"Error reading metrics.json: {e}")
-                self.metrics = None
-        else:
-            self.metrics = None
-
-        # Determine architecture hyperparameters from training_config if available
+        # --- Architecture hyperparameters ---
         in_channels = 5
         hidden_channels = 16
         kernel_size = 3
@@ -162,97 +214,94 @@ class ModelLoaderService:
             hidden_channels = self.training_config.get("hidden_channels", hidden_channels)
             kernel_size = self.training_config.get("kernel_size", kernel_size)
 
+        # --- Load primary model ---
         try:
-            model = ConvGRUResidualNetwork(
-                in_channels=in_channels,
-                hidden_channels=hidden_channels,
-                kernel_size=kernel_size
-            ).to(self.device)
-
-            # Load checkpoint state_dict
-            loaded = torch.load(ckpt_path, map_location=self.device)
-            if isinstance(loaded, dict) and "state_dict" in loaded:
-                state_dict = loaded["state_dict"]
-            elif isinstance(loaded, dict) and "model_state_dict" in loaded:
-                state_dict = loaded["model_state_dict"]
-            elif isinstance(loaded, dict):
-                state_dict = loaded
-            else:
-                raise ValueError("Checkpoint does not contain a valid PyTorch state_dict.")
-
-            model.load_state_dict(state_dict)
-            model.eval()
-
-            # Validate tensor compatibility with test forward pass
-            dummy_in = torch.zeros(1, in_channels, 128, 128, device=self.device)
-            with torch.no_grad():
-                res, _ = model(dummy_in)
-                if res.shape != (1, 1, 128, 128):
-                    raise ValueError(f"Incompatible output shape: expected (1, 1, 128, 128), got {res.shape}")
-
-            self.model = model
+            self.model = self._try_load_model(ckpt_path, in_channels, hidden_channels, kernel_size)
             self.is_trained = True
             self.status = "trained"
-            self.message = "Trained ConvGRU checkpoint loaded and active."
-            logger.info("Successfully loaded trained ConvGRU checkpoint.")
-            return True
-
+            self.message = f"Trained ConvGRU checkpoint '{found_name}' loaded and active."
+            logger.info(self.message)
         except Exception as e:
             self.model = None
             self.is_trained = False
             self.status = "not_trained"
-            self.message = f"Failed to load checkpoint '{ckpt_path}': {str(e)}"
+            self.message = f"Failed to load '{found_name}': {e}"
             logger.error(self.message)
             return False
 
+        # --- Load secondary multimodal model if different file exists ---
+        mm_name = "multimodal_convgru_rain.pt"
+        mm_path = os.path.join(self.model_dir, mm_name)
+        if mm_path != ckpt_path and os.path.exists(mm_path):
+            try:
+                self.multimodal_model = self._try_load_model(
+                    mm_path, in_channels, hidden_channels, kernel_size
+                )
+                self.multimodal_loaded = True
+                logger.info(f"Secondary multimodal model '{mm_name}' loaded.")
+            except Exception as e:
+                logger.warning(f"Could not load secondary model '{mm_name}': {e}")
+                self.multimodal_model = None
+                self.multimodal_loaded = False
+        else:
+            self.multimodal_model = None
+            self.multimodal_loaded = False
+
+        return True
+
     def get_model_info(self) -> Dict[str, Any]:
-        """
-        Returns info for GET /model-info
-        Complies strictly with:
-        If checkpoint does not exist:
-        { "status": "not_trained" }
-        """
+        """Returns info for GET /model-info, consumed by the React ModelComparisonPanel."""
         if not self.is_trained or self.model is None:
             return {
                 "status": "not_trained",
                 "message": "TRAINED MODEL NOT AVAILABLE",
                 "model": "ConvGRU Residual Nowcaster",
                 "version": "convnowcast-v0.1",
-                "expected_checkpoint": self.CHECKPOINT_FILENAME,
-                "expected_files": [
-                    "backend/models/convgru_best.pt",
-                    "backend/models/normalization.json",
-                    "backend/models/training_config.json",
-                    "backend/models/metrics.json"
-                ]
+                "searched_in": self.model_dir,
+                "expected_files": self.CHECKPOINT_CANDIDATES,
             }
 
-        # Trained checkpoint info
-        training_dataset = "INSAT-3D Historical Convective Dataset (07-NOV-2019)"
+        training_dataset = "INSAT-3D / Radar Convective Dataset (SIH 2026)"
         if self.training_config and "dataset_info" in self.training_config:
             d_info = self.training_config["dataset_info"]
-            if isinstance(d_info, dict):
-                training_dataset = d_info.get("name", training_dataset)
-            elif isinstance(d_info, str):
-                training_dataset = d_info
+            training_dataset = d_info.get("name", training_dataset) if isinstance(d_info, dict) else str(d_info)
 
-        trained_at = None
-        if self.metrics and "trained_at" in self.metrics:
-            trained_at = self.metrics["trained_at"]
-        elif self.training_config and "trained_at" in self.training_config:
-            trained_at = self.training_config["trained_at"]
+        trained_at = (
+            (self.metrics or {}).get("trained_at")
+            or (self.training_config or {}).get("trained_at")
+            or "Colab SIH-2026 training run"
+        )
+
+        # Build loaded-models list for UI
+        loaded_models = [
+            {
+                "id": "CONVGRU",
+                "name": "ConvGRU Residual Nowcaster (Radar)",
+                "checkpoint": self.checkpoint_filename,
+                "status": "trained",
+            }
+        ]
+        if self.multimodal_loaded:
+            loaded_models.append({
+                "id": "MULTIMODAL",
+                "name": "Multimodal ConvGRU (Rain-Aware)",
+                "checkpoint": "multimodal_convgru_rain.pt",
+                "status": "trained",
+            })
 
         return {
-            "model": "ConvGRU Residual Nowcaster",
-            "version": self.training_config.get("version", "convnowcast-v0.1") if self.training_config else "convnowcast-v0.1",
             "status": "trained",
-            "checkpoint": self.CHECKPOINT_FILENAME,
+            "model": "ConvGRU Residual Nowcaster",
+            "version": (self.training_config or {}).get("version", "convnowcast-v0.1"),
+            "checkpoint": self.checkpoint_filename,
+            "loaded_models": loaded_models,
+            "multimodal_available": self.multimodal_loaded,
             "training_dataset": training_dataset,
             "metrics": self.metrics or {},
-            "trained_at": trained_at or "Colab training run",
+            "trained_at": trained_at,
             "inference_device": str(self.device),
             "normalization": self.normalization,
-            "training_config": self.training_config
+            "training_config": self.training_config,
         }
 
     def normalize(self, field: np.ndarray) -> np.ndarray:
@@ -281,13 +330,24 @@ class ModelLoaderService:
                          prev_frame: np.ndarray,
                          curr_frame: np.ndarray,
                          flow: np.ndarray,
-                         env_field: Optional[np.ndarray] = None) -> np.ndarray:
+                         env_field: Optional[np.ndarray] = None,
+                         use_multimodal: bool = False) -> np.ndarray:
         """
         Inference on 128x128 grid using the loaded trained ConvGRU.
-        Raises RuntimeError if model is not trained.
+        If use_multimodal=True and the multimodal model is loaded, uses that instead.
+        Raises RuntimeError if no model is trained.
         """
         if not self.is_trained or self.model is None:
-            raise RuntimeError("TRAINED MODEL NOT AVAILABLE: Missing backend/models/convgru_best.pt")
+            raise RuntimeError(
+                f"TRAINED MODEL NOT AVAILABLE: none of {self.CHECKPOINT_CANDIDATES} "
+                f"found in '{self.model_dir}'"
+            )
+
+        active_model = (
+            self.multimodal_model
+            if (use_multimodal and self.multimodal_loaded and self.multimodal_model is not None)
+            else self.model
+        )
 
         h, w = curr_frame.shape
         target_h, target_w = 128, 128
@@ -297,17 +357,18 @@ class ModelLoaderService:
         u_small = cv2.resize(flow[:, :, 0], (target_w, target_h), interpolation=cv2.INTER_AREA) / 10.0
         v_small = cv2.resize(flow[:, :, 1], (target_w, target_h), interpolation=cv2.INTER_AREA) / 10.0
 
-        if env_field is not None:
-            env_small = cv2.resize(env_field, (target_w, target_h), interpolation=cv2.INTER_AREA)
-        else:
-            env_small = np.ones((target_h, target_w), dtype=np.float32) * 0.7
+        env_small = (
+            cv2.resize(env_field, (target_w, target_h), interpolation=cv2.INTER_AREA)
+            if env_field is not None
+            else np.ones((target_h, target_w), dtype=np.float32) * 0.7
+        )
 
         # Assemble 5-channel tensor: [prev, curr, u, v, env]
         tensor_in = np.stack([prev_small, curr_small, u_small, v_small, env_small], axis=0)
         tensor_in = torch.from_numpy(tensor_in).unsqueeze(0).float().to(self.device)
 
         with torch.no_grad():
-            residual_tensor, _ = self.model(tensor_in)
+            residual_tensor, _ = active_model(tensor_in)
             res_np = residual_tensor.squeeze().cpu().numpy()
 
         # Upsample residual back to full resolution

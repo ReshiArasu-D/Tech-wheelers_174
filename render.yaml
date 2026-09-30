@@ -1,13 +1,36 @@
 services:
+  # 1. Backend Web Service (FastAPI + PyTorch CPU)
   - type: web
     name: co-nowcast-backend
     env: python
     region: singapore
     plan: free
-    buildCommand: "pip install -r requirements.txt && python backend/scripts/convert_insat_to_hdf5.py"
+    buildCommand: "pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt"
     startCommand: "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: ENVIRONMENT
         value: production
+
+  # 2. Frontend Static Site (React Vite)
+  - type: web
+    name: co-nowcast-frontend
+    env: static
+    region: singapore
+    plan: free
+    rootDir: frontend
+    buildCommand: "npm install && npm run build"
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: co-nowcast-backend
+          property: host
+      - key: VITE_MAPTILER_API_KEY
+        value: ehLkmAaIGPEMafg5WhXy

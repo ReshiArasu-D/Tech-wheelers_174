@@ -180,6 +180,33 @@ export default function ModelComparisonPanel({
           </div>
         )}
       </div>
+
+      {/* Forecast Confidence Degradation Bands */}
+      <div style={{ marginTop: '12px', borderTop: '1px solid rgba(56, 189, 248, 0.12)', paddingTop: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#f8fafc' }}>
+            FORECAST CONFIDENCE BY LEAD TIME
+          </div>
+          <span style={{ fontSize: '0.62rem', color: '#94a3b8' }}>Prototype Indicator</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          {[
+            { hz: '+15 min', pct: 90, tier: 'HIGH', color: '#10b981' },
+            { hz: '+30 min', pct: 80, tier: 'HIGH', color: '#10b981' },
+            { hz: '+60 min', pct: 65, tier: 'MEDIUM', color: '#38bdf8' },
+            { hz: '+180 min', pct: 45, tier: 'MEDIUM', color: '#f59e0b' },
+            { hz: '+360 min', pct: 28, tier: 'LOW', color: '#f43f5e' }
+          ].map((bar, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.68rem' }}>
+              <span className="mono" style={{ width: '56px', color: '#94a3b8' }}>{bar.hz}</span>
+              <div style={{ flex: 1, height: '6px', background: 'rgba(30, 41, 59, 0.6)', borderRadius: '3px', overflow: 'hidden' }}>
+                <div style={{ width: `${bar.pct}%`, height: '100%', background: bar.color, borderRadius: '3px', transition: 'width 0.3s ease' }} />
+              </div>
+              <span style={{ width: '48px', textAlign: 'right', fontWeight: 700, color: bar.color }}>{bar.tier}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

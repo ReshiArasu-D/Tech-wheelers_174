@@ -20,6 +20,9 @@ from backend.app.api.storms import router as storms_router
 from backend.app.api.forecast import router as forecast_router
 from backend.app.api.hazards import router as hazards_router
 from backend.app.api.alerts import router as alerts_router
+from backend.app.api.ai import router as ai_router
+from backend.app.api.ws import router as ws_router
+from backend.app.api.dwr_replay import router as dwr_replay_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -60,16 +63,36 @@ app.include_router(storms_router)
 app.include_router(forecast_router)
 app.include_router(hazards_router)
 app.include_router(alerts_router)
+app.include_router(ai_router)
+app.include_router(ws_router)
+app.include_router(dwr_replay_router)
 
-@app.get("/")
-def root():
-    return {
-        "title": "CO-NOWCAST API",
-        "description": "Convective Scale Nowcasting for Thunderstorms, Hail & Cloudbursts (0-6 hr)",
-        "version": "convnowcast-v0.1",
-        "docs_url": "/docs",
-        "health_url": "/health"
-    }
+# ── Serve Built Frontend SPA (Unified Single-Service Deployment on Render) ───
+frontend_dist = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+if os.path.isdir(frontend_dist):
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        if full_path:
+            file_path = os.path.join(frontend_dist, full_path)
+            if os.path.isfile(file_path):
+                return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
+else:
+    @app.get("/")
+    def root():
+        return {
+            "title": "CO-NOWCAST API",
+            "description": "Convective Scale Nowcasting for Thunderstorms, Hail & Cloudbursts (0-6 hr)",
+            "version": "convnowcast-v0.1",
+            "docs_url": "/docs",
+            "health_url": "/health"
+        }
 
 if __name__ == "__main__":
     uvicorn.run("backend.app.main:app", host=settings.HOST, port=settings.PORT, reload=True)

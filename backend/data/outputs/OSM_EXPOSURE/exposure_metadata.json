@@ -1,0 +1,20 @@
+{
+  "source": "OpenStreetMap",
+  "region": "KTLX development region",
+  "radar_latitude": 35.3333625793457,
+  "radar_longitude": -97.27776336621093,
+  "bbox": [
+    34.8833625793457,
+    35.783362579345706,
+    -97.72776336621094,
+    -96.82776336621093
+  ],
+  "grid_shape": [
+    128,
+    128
+  ],
+  "osm_elements": 2861323,
+  "spatial_features": 383753,
+  "normalization": "observed OSM 1st-99th percentile",
+  "synthetic_exposure": false
+}

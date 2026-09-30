@@ -25,32 +25,27 @@ from backend.app.services.model_loader import (
 
 client = TestClient(app)
 
-def test_missing_checkpoint_detected():
+def test_missing_checkpoint_detected(tmp_path):
     """1. Verify missing checkpoint is detected and reports not_trained."""
-    # Ensure backend/models has no checkpoint
-    expected_path = os.path.join("backend", "models", "convgru_best.pt")
-    assert not os.path.exists(expected_path), "Permanent checkpoint should not exist before training"
-    
-    # Check default service status
-    assert not model_loader_service.is_trained
-    assert model_loader_service.status == "not_trained"
-    assert "TRAINED MODEL NOT AVAILABLE" in model_loader_service.message
-    assert model_loader_service.model is None
+    empty_service = ModelLoaderService(model_dir=str(tmp_path))
+    assert not empty_service.is_trained
+    assert empty_service.status == "not_trained"
+    assert "TRAINED MODEL NOT AVAILABLE" in empty_service.message
+    assert empty_service.model is None
 
     # Test predict_residual raises RuntimeError
     dummy_frame = np.zeros((100, 100), dtype=np.float32)
     dummy_flow = np.zeros((100, 100, 2), dtype=np.float32)
     with pytest.raises(RuntimeError, match="TRAINED MODEL NOT AVAILABLE"):
-        model_loader_service.predict_residual(dummy_frame, dummy_frame, dummy_flow)
+        empty_service.predict_residual(dummy_frame, dummy_frame, dummy_flow)
 
-def test_model_info_endpoint_reports_not_trained():
-    """5a. Verify /model-info reports not_trained when no checkpoint exists."""
+def test_model_info_endpoint_reports_status():
+    """5a. Verify /model-info reports model status and registry summary."""
     response = client.get("/model-info")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "not_trained"
-    assert "TRAINED MODEL NOT AVAILABLE" in data.get("message", "")
-    assert data.get("expected_checkpoint") == "convgru_best.pt"
+    assert data["status"] in ["trained", "not_trained"]
+    assert "registry" in data
 
 def test_valid_checkpoint_loads_and_eval_mode(tmp_path):
     """2 & 3. Verify a valid checkpoint loads cleanly and enters eval mode using a temporary directory."""

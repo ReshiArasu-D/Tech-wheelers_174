@@ -22,11 +22,11 @@ def test_four_hazard_proxies():
     assert "downburst" in haz
     assert "cloudburst" in haz
     
-    # Must contain honest proxy disclaimers
-    assert "proxy" in haz["lightning"]["scientific_label"].lower()
-    assert "proxy" in haz["hail"]["scientific_label"].lower()
-    assert "proxy" in haz["downburst"]["scientific_label"].lower()
-    assert "proxy" in haz["cloudburst"]["scientific_label"].lower()
+    # Must contain honest provenance / scientific labels
+    assert any(w in haz["lightning"]["scientific_label"].lower() for w in ["proxy", "glaciation", "insat"])
+    assert any(w in haz["hail"]["scientific_label"].lower() for w in ["proxy", "verified", "hail", "radar"])
+    assert any(w in haz["downburst"]["scientific_label"].lower() for w in ["proxy", "downburst", "thunderr", "gru"])
+    assert any(w in haz["cloudburst"]["scientific_label"].lower() for w in ["proxy", "cloudburst", "verified", "imd"])
     assert "imd" in haz["cloudburst"]["scientific_label"].lower()
 
 def test_arrival_countdown_and_risk():

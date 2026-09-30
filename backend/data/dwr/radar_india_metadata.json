@@ -1,0 +1,33 @@
+{
+  "dataset": "ISRO TERLS C-band DWR",
+  "event_date": "2019-11-07",
+  "num_scans": 20,
+  "num_sequences": 15,
+  "input_shape": [
+    15,
+    5,
+    3,
+    128,
+    128
+  ],
+  "target_shape": [
+    15,
+    128,
+    128
+  ],
+  "input_channels": [
+    "DBZ",
+    "VEL",
+    "validity_mask"
+  ],
+  "target": "next-frame reflectivity",
+  "spatial_size": [
+    128,
+    128
+  ],
+  "sequence_length": 5,
+  "training_mode": "INDIAN_FROM_SCRATCH",
+  "best_validation_loss": 0.00015586147492285818,
+  "final_validation_loss": 0.00015586147492285818,
+  "checkpoint": "/content/drive/MyDrive/SIH_NOWCAST/data/dwr/radar_convgru_india_20191107.pt"
+}

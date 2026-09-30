@@ -16,6 +16,15 @@ class Settings(BaseSettings):
     DATA_DIR: str = os.getenv("DATA_DIR", os.path.join(BASE_DIR, "data"))
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+    
+    # DWR Radar Dynamic Configuration
+    DWR_MODEL_PATH: str = os.getenv("DWR_MODEL_PATH", "")
+    DWR_DATA_DIR: str = os.getenv("DWR_DATA_DIR", "")
+
+    # Generative Intelligence Layer Settings
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    AI_MODEL: str = os.getenv("AI_MODEL", "gemini-2.5-flash")
 
     class Config:
         env_file = ".env"

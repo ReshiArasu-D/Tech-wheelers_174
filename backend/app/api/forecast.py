@@ -14,7 +14,8 @@ def get_forecast(event_id: str,
                  model: Optional[str] = Query("CONVGRU")):
     state = forecasting_pipeline.run_pipeline_for_frame(
         timestamp=timestamp,
-        model_override=model
+        model_override=model,
+        event_id=event_id
     )
     return {
         "event_id": event_id,
@@ -34,7 +35,9 @@ def predict_frame(request: PredictFrameRequest):
     state = forecasting_pipeline.run_pipeline_for_frame(
         timestamp=request.timestamp,
         sensor_override=request.sensor_override,
-        model_override=request.model_override
+        model_override=request.model_override,
+        radar_data=request.radar_data,
+        event_id=request.event_id
     )
     return state
 

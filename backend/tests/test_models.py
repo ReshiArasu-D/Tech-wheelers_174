@@ -24,10 +24,12 @@ def test_optical_flow_motion():
     assert "speed_kmh" in motion
     assert 0.0 <= motion["direction_deg"] <= 360.0
 
-def test_convgru_residual_inference_untrained_fails_safely():
+def test_convgru_residual_inference_untrained_fails_safely(tmp_path):
     """Verify that when no checkpoint is present, ConvGRU refuses random weights and reports untrained."""
-    assert not convgru_nowcaster.is_trained
-    assert convgru_nowcaster.model_status == "not_trained"
+    from backend.app.services.model_loader import ModelLoaderService
+    empty_loader = ModelLoaderService(model_dir=str(tmp_path))
+    assert not empty_loader.is_trained
+    assert empty_loader.status == "not_trained"
     
     ts = satellite_service.get_available_timestamps()
     f0 = satellite_service.read_frame(ts[0])
@@ -36,7 +38,12 @@ def test_convgru_residual_inference_untrained_fails_safely():
     
     # Must raise RuntimeError rather than silently using random weights
     with pytest.raises(RuntimeError, match="TRAINED MODEL NOT AVAILABLE"):
-        convgru_nowcaster.predict_residual(f0["convective_intensity"], f1["convective_intensity"], flow)
+        empty_loader.predict_residual(f0["convective_intensity"], f1["convective_intensity"], flow)
+
+    # Active singleton must be trained if checkpoint is present
+    if convgru_nowcaster.is_trained:
+        res = convgru_nowcaster.predict_residual(f0["convective_intensity"], f1["convective_intensity"], flow)
+        assert res.shape == f0["convective_intensity"].shape
 
 def test_multi_horizon_forecasting():
     ts = satellite_service.get_available_timestamps()

@@ -34,6 +34,7 @@ from backend.app.services.detection import detection_service
 from backend.app.services.tracking import tracking_service
 from backend.app.models.optical_flow import optical_flow_model
 from backend.app.models.convgru import convgru_nowcaster
+from backend.app.models.dwr_convgru import dwr_service
 from backend.app.models.uncertainty import uncertainty_engine
 from backend.app.services.hazards import hazard_service
 from backend.app.services.risk import risk_engine
@@ -47,35 +48,47 @@ class ForecastingPipeline:
     def run_pipeline_for_frame(self,
                                timestamp: Optional[str] = None,
                                sensor_override: Optional[Dict[str, str]] = None,
-                               model_override: Optional[str] = "CONVGRU") -> Dict[str, Any]:
+                               model_override: Optional[str] = "CONVGRU",
+                               radar_data: Optional[Any] = None,
+                               event_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Executes the full end-to-end scientific nowcasting pipeline.
-        Supports sensor dropout simulations and model comparison toggles.
+        Supports sensor dropout simulations, model comparison toggles, and dynamic DWR input.
         """
         available_ts = satellite_service.get_available_timestamps()
         if not available_ts:
             raise RuntimeError("No historical INSAT-3D frames indexed.")
 
-        if not timestamp or timestamp not in available_ts:
-            # Default to middle-to-peak convective sequence frame (e.g. 05:00 UTC)
-            timestamp = available_ts[min(4, len(available_ts) - 1)]
+        if not timestamp:
+            timestamp = available_ts[0]
 
-        curr_idx = available_ts.index(timestamp)
-        prev_idx = max(0, curr_idx - 1)
-        prev_ts = available_ts[prev_idx]
+        # Determine previous timestamp for temporal derivative / optical flow
+        try:
+            curr_dt = datetime.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            prev_dt = curr_dt - datetime.timedelta(minutes=10)
+            prev_ts = prev_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        except Exception:
+            prev_ts = timestamp
 
         # 1. Read real satellite frames
         curr_frame = satellite_service.read_frame(timestamp)
         prev_frame = satellite_service.read_frame(prev_ts)
+        frame_idx = available_ts.index(timestamp) if timestamp in available_ts else 0
+        curr_frame["seq_idx"] = frame_idx
+        curr_frame["frame_index"] = frame_idx
 
         # 2. Get ERA5 environmental context
         era5_context = satellite_service.get_era5_context(timestamp)
 
-        # 3. Sensor availability mask (with optional user simulation override)
+        # 3. Dynamic Sensor availability
+        dwr_prediction = None
+        if radar_data is not None and dwr_service.is_loaded:
+            dwr_prediction = dwr_service.predict_from_incoming(radar_data)
+
         sensors = {
             "insat": "available",
             "era5": "available",
-            "dwr": "unavailable",
+            "dwr": "available" if dwr_prediction is not None else "unavailable",
             "lightning": "unavailable"
         }
         if sensor_override:
@@ -88,7 +101,7 @@ class ForecastingPipeline:
         detected_storms = detection_service.detect_storm_cells(curr_frame, ci_result)
 
         # 6. Multi-Frame Tracking & Lineage
-        if prev_idx != curr_idx:
+        if prev_ts != timestamp:
             prev_detected = detection_service.detect_storm_cells(prev_frame)
             prev_tracked = tracking_service.track_cells([], prev_detected, prev_ts)
             tracked_storms = tracking_service.track_cells(prev_tracked, detected_storms, timestamp)
@@ -141,8 +154,9 @@ class ForecastingPipeline:
         # 14. Unified Storm State JSON
         model_is_trained = convgru_nowcaster.is_trained
         model_status_label = "TRAINED" if model_is_trained else "TRAINED MODEL NOT AVAILABLE"
+        date_slug = timestamp[:10].replace("-", "") if timestamp else "LIVE"
         storm_state = {
-            "event_id": "EVENT-20191107-BOB-01",
+            "event_id": event_id or f"EVENT-{date_slug}-NOWCAST",
             "timestamp": timestamp,
             "model_version": "convnowcast-v0.1",
             "model_status": convgru_nowcaster.model_status,
@@ -163,6 +177,16 @@ class ForecastingPipeline:
                 "radar_coverage_gap": True,
                 "overall_confidence_discount": uncertainty_info["confidence_discount_factor"],
                 "mode_label": "PROTOTYPE: INSAT + ERA5 REDUCED SENSOR FUSION" if sensors["dwr"] != "available" else "FULL OPERATIONAL FUSION"
+            },
+            "sensor_data": {
+                "satellite": {
+                    "stats": curr_frame.get("stats", {}),
+                    "bounds": curr_frame.get("bounds", {}),
+                    "metadata": curr_frame.get("metadata", {}),
+                    "obs_timestamp": curr_frame.get("obs_timestamp", curr_frame.get("timestamp")),
+                    "image_data_uri": curr_frame.get("image_data_uri", "")
+                },
+                "era5": era5_context,
             },
             "storms": tracked_storms,
             "forecasts": forecasts,
@@ -245,7 +269,10 @@ class ForecastingPipeline:
                 if existing:
                     candidates.append(existing[0])
                 else:
-                    sev = "SEVERE" if risk["overall_risk_score"] >= 75.0 else ("HIGH" if risk["overall_risk_score"] >= 50.0 else "MODERATE")
+                    primary_storm_area = storms[0].get("area_km2", 350.0) if storms else 250.0
+                    # Derive severity from composite risk level
+                    risk_level = risk.get("risk_level", "MODERATE")
+                    sev = risk_level  # SEVERE / HIGH / MODERATE / LOW
                     new_alert = {
                         "id": alert_id,
                         "event_id": "EVENT-20191107-BOB-01",
@@ -253,12 +280,20 @@ class ForecastingPipeline:
                         "target_region": target_name,
                         "severity": sev,
                         "hazard_types": arr.get("hazard_types", ["Thunderstorm", "Torrential Rain"]),
+                        "probability": arr.get("impact_probability", 0.75),
                         "risk_score": risk["overall_risk_score"],
                         "countdown": arr.get("countdown_display", "00:42:00"),
                         "confidence": arr.get("confidence", "MEDIUM"),
+                        "uncertainty": round(max(0.1, 1.0 - (arr.get("impact_probability", 0.75) * 0.7)), 2),
+                        "affected_area_km2": primary_storm_area,
+                        "exposure": f"Critical Zone: {target_name} ({risk.get('critical_infrastructure_risk', 'ELEVATED')})",
+                        "evidence_provenance": "INSAT-3D TIR1 Cloud-Top Cooling Rate + Dense Optical Flow Leading-Edge Vector",
                         "status": "CANDIDATE",
                         "approved_by": None,
-                        "approved_at": None
+                        "approved_at": None,
+                        "rejected_by": None,
+                        "rejected_at": None,
+                        "rejection_reason": None
                     }
                     self._active_alerts.append(new_alert)
                     candidates.append(new_alert)
@@ -273,6 +308,17 @@ class ForecastingPipeline:
                 alert["approved_by"] = operator_name
                 alert["approved_at"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
                 alert["comments"] = comments or "Approved after verification against convective initiation signatures."
+                return alert
+        raise KeyError(f"Alert ID {alert_id} not found.")
+
+    def reject_alert(self, alert_id: str, operator_name: str, reason: Optional[str] = None) -> Dict[str, Any]:
+        """Human rejection action for alert candidate."""
+        for alert in self._active_alerts:
+            if alert["id"] == alert_id:
+                alert["status"] = "REJECTED"
+                alert["rejected_by"] = operator_name
+                alert["rejected_at"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+                alert["rejection_reason"] = reason or "Operator rejected: convective dissipation or false alarm signature."
                 return alert
         raise KeyError(f"Alert ID {alert_id} not found.")
 

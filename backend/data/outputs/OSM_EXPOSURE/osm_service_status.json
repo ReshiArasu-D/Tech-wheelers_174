@@ -1,0 +1,8 @@
+{
+  "source": "OpenStreetMap",
+  "service": "Nominatim",
+  "radar_latitude": 35.3333625793457,
+  "radar_longitude": -97.27776336621093,
+  "requested_radius_km": 50,
+  "status": "OSM_SERVICE_REACHABLE"
+}

@@ -57,5 +57,33 @@ export const api = {
         comments: comments || 'Verified convective initiation signatures and corridor trajectory.'
       })
     }).then(handleResponse);
-  }
+  },
+  rejectAlert: (alertId, operatorName, reason) => {
+    return fetch(`${API_BASE}/alerts/${alertId}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        operator_name: operatorName || 'Chief Duty Meteorologist',
+        reason: reason || 'Operator rejected: convective dissipation or false alarm signature.'
+      })
+    }).then(handleResponse);
+  },
+  getAiSummary: (payload) => {
+    return fetch(`${API_BASE}/ai/summary`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(handleResponse);
+  },
+  sendAiChatMessage: (payload) => {
+    return fetch(`${API_BASE}/ai/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(handleResponse);
+  },
+
+  // DWR Historical Replay (real TERLS DWR → Indian ConvGRU)
+  getDwrReplayInfo: () => fetch(`${API_BASE}/dwr/replay/info`).then(handleResponse),
+  getDwrReplayFrame: (seqIdx) => fetch(`${API_BASE}/dwr/replay/frame/${seqIdx}`).then(handleResponse),
 };

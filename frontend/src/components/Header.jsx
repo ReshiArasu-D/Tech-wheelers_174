@@ -1,113 +1,348 @@
-import React from 'react';
-import { CloudLightning, Satellite, ShieldAlert, Activity, Database } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  CloudLightning, 
+  Bell, 
+  Settings, 
+  Bot, 
+  Database,
+  Layers, 
+  Activity, 
+  FileText, 
+  ShieldAlert,
+  ChevronDown
+} from 'lucide-react';
 
-export default function Header({ eventInfo, currentTimestamp, provenanceBadge, sensorStatus, activeAlertCount, onOpenAlertModal }) {
+export default function Header({
+  mode = 'replay', // 'live' | 'replay'
+  onSelectMode,
+  selectedModel = 'CONVGRU',
+  onSelectModel,
+  selectedRegion = 'TERLS',
+  onSelectRegion,
+  activeAlertCount = 1,
+  onOpenAlertModal,
+  onOpenSummaryModal,
+  onOpenChatDrawer,
+  onOpenDataSources,
+  currentTimestamp = null,
+  dwrReplayInfo = null
+}) {
+  const [currentClock, setCurrentClock] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentClock(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Format meteorological replay timestamp if in replay mode
+  const formatDisplayTimestamp = () => {
+    if (mode === 'replay' && currentTimestamp) {
+      try {
+        const d = new Date(currentTimestamp);
+        if (!isNaN(d.getTime())) {
+          const day = String(d.getUTCDate()).padStart(2, '0');
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const month = months[d.getUTCMonth()];
+          const year = d.getUTCFullYear();
+          const hours = String(d.getUTCHours()).padStart(2, '0');
+          const mins = String(d.getUTCMinutes()).padStart(2, '0');
+          const secs = String(d.getUTCSeconds()).padStart(2, '0');
+          return `${day} ${month} ${year}, ${hours}:${mins}:${secs} UTC`;
+        }
+      } catch (e) {
+        // fallback
+      }
+    }
+    // Fallback to real system clock UTC
+    const hours = String(currentClock.getUTCHours()).padStart(2, '0');
+    const mins = String(currentClock.getUTCMinutes()).padStart(2, '0');
+    const secs = String(currentClock.getUTCSeconds()).padStart(2, '0');
+    const day = String(currentClock.getUTCDate()).padStart(2, '0');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const mon = months[currentClock.getUTCMonth()];
+    const yr = currentClock.getUTCFullYear();
+    return `${day} ${mon} ${yr}, ${hours}:${mins}:${secs} UTC`;
+
+  };
+
+  const navItems = [
+    { id: 'live', label: 'Live' },
+    { id: 'replay', label: 'Replay' },
+    { id: 'analytics', label: 'Analytics' },
+    { id: 'reports', label: 'Reports' },
+    { id: 'alerts', label: 'Alerts', badge: activeAlertCount }
+  ];
+
   return (
     <header style={{
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '10px 20px',
-      background: 'rgba(10, 15, 26, 0.95)',
-      borderBottom: '1px solid rgba(56, 189, 248, 0.2)',
-      backdropFilter: 'blur(10px)',
-      zIndex: 1000
+      padding: '0 18px',
+      background: '#FFFFFF',
+      borderBottom: '1px solid #E2E8F0',
+      height: '52px',
+      flexShrink: 0,
+      zIndex: 100,
+      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
     }}>
-      {/* Title & Branding */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+      {/* LEFT: Logo + Title + Subtitle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <div style={{
-          width: '38px',
-          height: '38px',
-          borderRadius: '8px',
-          background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          background: '#2563EB',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 0 15px rgba(56, 189, 248, 0.4)'
+          color: '#FFFFFF',
+          boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
         }}>
-          <CloudLightning size={22} color="#ffffff" />
+          <CloudLightning size={18} strokeWidth={2.5} />
         </div>
+
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', letterSpacing: '-0.02em' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 style={{ 
+              fontSize: '1.05rem', 
+              fontWeight: 800, 
+              color: '#0F172A', 
+              letterSpacing: '-0.02em',
+              lineHeight: 1
+            }}>
               CO-NOWCAST
             </h1>
-            <span style={{
-              fontSize: '0.7rem',
-              fontWeight: 600,
-              padding: '2px 8px',
-              borderRadius: '4px',
-              letterSpacing: '0.05em'
-            }} className="badge-production">
-              SIH 2026 PS-26084
-            </span>
           </div>
-          <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+          <p style={{ fontSize: '0.68rem', color: '#64748B', marginTop: '2px', fontWeight: 500 }}>
             Convective Scale Nowcasting for Thunderstorms, Hail & Cloudbursts (0–6 hr)
           </p>
         </div>
       </div>
 
-      {/* Provenance & Scientific Honesty Badge */}
+      {/* CENTER: Navigation pills (Live / Replay / Analytics / Reports / Alerts) */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '12px',
-        padding: '6px 14px',
-        borderRadius: '8px',
-        background: 'rgba(15, 23, 42, 0.75)',
-        border: '1px solid rgba(245, 158, 11, 0.3)'
+        background: '#F1F5F9',
+        border: '1px solid #E2E8F0',
+        borderRadius: '7px',
+        padding: '2px'
       }}>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: '3px' }} className="badge-real">
-              REAL DATA
-            </span>
-            <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: '3px' }} className="badge-proxy">
-              PROTOTYPE SENSOR FUSION
-            </span>
-            <span style={{ fontSize: '0.75rem', color: '#e2e8f0', fontWeight: 600 }}>
-              INSAT-3D + ERA5 Replay
-            </span>
-          </div>
-          <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
-            Model: <strong style={{ color: '#38bdf8' }}>{provenanceBadge?.model || 'ConvGRU Residual + Optical Flow'}</strong> | Res: <strong style={{ color: '#cbd5e1' }}>3.7 km native</strong>
-          </div>
-        </div>
+        {navItems.map(item => {
+          const isActive = (item.id === 'live' && mode === 'live') || 
+                           (item.id === 'replay' && mode === 'replay');
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                if (item.id === 'live' || item.id === 'replay') {
+                  onSelectMode?.(item.id);
+                } else if (item.id === 'alerts') {
+                  onOpenAlertModal?.();
+                } else if (item.id === 'reports' || item.id === 'analytics') {
+                  onOpenSummaryModal?.();
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 14px',
+                borderRadius: '5px',
+                background: isActive ? '#2563EB' : 'transparent',
+                border: 'none',
+                color: isActive ? '#FFFFFF' : '#475569',
+                fontWeight: isActive ? 600 : 500,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>{item.label}</span>
+              {item.badge > 0 && (
+                <span style={{
+                  fontSize: '9px',
+                  fontWeight: 800,
+                  background: isActive ? '#DC2626' : '#DC2626',
+                  color: '#FFFFFF',
+                  padding: '1px 5px',
+                  borderRadius: '10px'
+                }}>
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Alerts & Telemetry */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Analysis Timestamp
+      {/* RIGHT: Timestamp + Model + Region + Data Sources + Bell + Avatar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Real Backend / Meteorological Timestamp */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          marginRight: '4px'
+        }}>
+          <div style={{
+            fontSize: '0.80rem',
+            fontWeight: 700,
+            color: '#0F172A',
+            fontFamily: 'monospace',
+            letterSpacing: '-0.01em'
+          }}>
+            {formatDisplayTimestamp()}
           </div>
-          <div className="mono" style={{ fontSize: '0.85rem', color: '#38bdf8', fontWeight: 600 }}>
-            {currentTimestamp ? currentTimestamp.replace('T', ' ').replace('Z', ' UTC') : 'LIVE SYNOPTIC'}
+          <div style={{
+            fontSize: '0.66rem',
+            color: '#2563EB',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            <span style={{
+              width: '4px',
+              height: '4px',
+              borderRadius: '50%',
+              background: mode === 'live' ? '#16A34A' : '#2563EB'
+            }} />
+            {mode === 'live' ? 'Live Stream' : 'Historical Replay'}
           </div>
         </div>
 
-        {activeAlertCount > 0 && (
-          <button
-            onClick={onOpenAlertModal}
-            className="badge-alert"
-            style={{
+        {/* Model Selector */}
+        <select
+          value={selectedModel}
+          onChange={(e) => onSelectModel?.(e.target.value)}
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid #CBD5E1',
+            borderRadius: '6px',
+            padding: '5px 8px',
+            fontSize: '0.73rem',
+            fontWeight: 600,
+            color: '#0F172A',
+            cursor: 'pointer',
+            outline: 'none',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+          }}
+        >
+          <option value="CONVGRU">Model: ConvGRU (Trained)</option>
+          <option value="OPTICAL_FLOW">Model: Optical Flow (TV-L1)</option>
+          <option value="PERSISTENCE">Model: Persistence Baseline</option>
+        </select>
+
+        {/* Region Selector */}
+        <select
+          value={selectedRegion}
+          onChange={(e) => onSelectRegion?.(e.target.value)}
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid #CBD5E1',
+            borderRadius: '6px',
+            padding: '5px 8px',
+            fontSize: '0.73rem',
+            fontWeight: 600,
+            color: '#0F172A',
+            cursor: 'pointer',
+            outline: 'none',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+          }}
+        >
+          <option value="TERLS">Region: Kerala (TERLS Radar)</option>
+          <option value="India">Region: India (National)</option>
+          <option value="Odisha">Region: Odisha / Bhubaneswar</option>
+          <option value="Bengal">Region: Bay of Bengal Convective</option>
+        </select>
+
+        {/* Data Sources Button */}
+        <button
+          onClick={onOpenDataSources}
+          title="Data Sources & Provenance"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            background: '#FFFFFF',
+            border: '1px solid #CBD5E1',
+            borderRadius: '6px',
+            padding: '5px 9px',
+            fontSize: '0.73rem',
+            fontWeight: 600,
+            color: '#2563EB',
+            cursor: 'pointer',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+          }}
+        >
+          <Database size={13} />
+          <span>Data Sources</span>
+        </button>
+
+        {/* Notification Bell */}
+        <button
+          onClick={onOpenAlertModal}
+          title="Alert Candidates"
+          style={{
+            position: 'relative',
+            background: '#FFFFFF',
+            border: '1px solid #CBD5E1',
+            borderRadius: '6px',
+            width: '30px',
+            height: '30px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#64748B',
+            cursor: 'pointer',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+          }}
+        >
+          <Bell size={15} />
+          {activeAlertCount > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: '-3px',
+              right: '-3px',
+              width: '13px',
+              height: '13px',
+              borderRadius: '50%',
+              background: '#DC2626',
+              color: '#FFFFFF',
+              fontSize: '8px',
+              fontWeight: 800,
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '0.8rem',
-              border: 'none',
-              outline: 'none'
-            }}
-          >
-            <ShieldAlert size={16} />
-            {activeAlertCount} Alert Candidate{activeAlertCount > 1 ? 's' : ''}
-          </button>
-        )}
+              justifyContent: 'center'
+            }}>
+              {activeAlertCount}
+            </span>
+          )}
+        </button>
+
+        {/* User Profile Avatar (matching circle 'R' in reference) */}
+        <div 
+          onClick={onOpenChatDrawer}
+          title="Operator Profile / AI Assistant"
+          style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '50%',
+            background: '#2563EB',
+            color: '#FFFFFF',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 1px 3px rgba(37, 99, 235, 0.3)'
+          }}
+        >
+          R
+        </div>
       </div>
     </header>
   );
