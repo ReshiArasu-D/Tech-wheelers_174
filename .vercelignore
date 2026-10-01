@@ -1,7 +1,6 @@
 # Exclude heavy raw datasets and binary archives from Vercel function bundle (5.5+ GB reduction)
 backend/data/insat/
 backend/data/insat/**
-*.h5
 *.zip
 dwr_unzipped/
 backend/data/outputs/

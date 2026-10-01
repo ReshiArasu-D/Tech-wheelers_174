@@ -137,7 +137,28 @@ export default function GisMap({
         type: 'raster',
         source: 'insat-raster-src',
         paint: {
-          'raster-opacity': 0.40,
+          'raster-opacity': 0.70,
+          'raster-fade-duration': 0
+        }
+      });
+
+      // 1b. DWR Radar Reflectivity Raster (Observed C-Band Doppler Radar Scan over Kerala)
+      map.addSource('dwr-radar-src', {
+        type: 'image',
+        url: blankPixel,
+        coordinates: [
+          [74.6866, 10.7741], // top-left
+          [79.1866, 10.7741], // top-right
+          [79.1866, 6.2741],  // bottom-right
+          [74.6866, 6.2741]   // bottom-left
+        ]
+      });
+      map.addLayer({
+        id: 'dwr-radar-layer',
+        type: 'raster',
+        source: 'dwr-radar-src',
+        paint: {
+          'raster-opacity': 0.80,
           'raster-fade-duration': 0
         }
       });
@@ -456,6 +477,7 @@ export default function GisMap({
     };
 
     setLayerVis('insat-tir1-layer', visibleLayers.sat_ir !== false);
+    setLayerVis('dwr-radar-layer', visibleLayers.dwr_obs !== false);
     setLayerVis('dwr-obs-layer', visibleLayers.dwr_obs !== false);
     setLayerVis('dwr-pred-layer', visibleLayers.dwr_pred !== false);
     setLayerVis('corridor-fill', visibleLayers.tracks !== false);
@@ -720,43 +742,73 @@ export default function GisMap({
     });
   }, [mapLoaded, storms, dwrFrameData, selectedStorm, visibleLayers.storms, onSelectStorm]);
 
-  // ── 7b. Update Real INSAT Raster Image ──────────────────────────────────
+  // ── 7b. Update Real INSAT & DWR Radar Raster Images ──────────────────────
   const insatObj = dwrFrameData?.insat_frame || stormState?.sensor_data?.satellite;
   const insatUri = insatObj?.image_data_uri;
   const insatBounds = insatObj?.bounds;
   const insatObsTs = insatObj?.obs_timestamp;
   const insatFile = insatObj?.filename;
   const insatDeltaT = insatObj?.time_difference_minutes;
+  const dwrRadarUri = dwrFrameData?.dwr_image_data_uri;
 
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current || !insatUri) return;
+    if (!mapLoaded || !mapRef.current) return;
     const map = mapRef.current;
-    const src = map.getSource('insat-raster-src');
-    if (src && insatUri) {
-      const minLon = insatBounds?.min_lon ?? 79.99;
-      const maxLon = insatBounds?.max_lon ?? 93.94;
-      const minLat = insatBounds?.min_lat ?? 10.06;
-      const maxLat = insatBounds?.max_lat ?? 24.01;
-      src.updateImage({
-        url: insatUri,
-        coordinates: [
-          [minLon, maxLat],
-          [maxLon, maxLat],
-          [maxLon, minLat],
-          [minLon, minLat]
-        ]
-      });
-      map.triggerRepaint();
 
-      console.log(
-        `[GIS-MAP INSAT UPDATE] DWR: ${dwrFrameData?.timestamp || 'N/A'} ` +
-        `-> Selected File: ${insatFile || 'N/A'} ` +
-        `-> Obs: ${insatObsTs || 'N/A'} ` +
-        `-> Δt: ${insatDeltaT != null ? insatDeltaT : 'N/A'}m ` +
-        `-> Raster Layer Updated`
-      );
+    // 1. Update Real INSAT Satellite Raster (Bay of Bengal / Subcontinent)
+    if (insatUri) {
+      const src = map.getSource('insat-raster-src');
+      if (src) {
+        const minLon = insatBounds?.min_lon ?? 79.99;
+        const maxLon = insatBounds?.max_lon ?? 93.94;
+        const minLat = insatBounds?.min_lat ?? 10.06;
+        const maxLat = insatBounds?.max_lat ?? 24.01;
+        try {
+          src.updateImage({
+            url: insatUri,
+            coordinates: [
+              [minLon, maxLat],
+              [maxLon, maxLat],
+              [maxLon, minLat],
+              [minLon, minLat]
+            ]
+          });
+        } catch (e) {
+          console.warn('[GisMap] INSAT raster updateImage error:', e);
+        }
+
+        console.log(
+          `[GIS-MAP INSAT UPDATE] DWR: ${dwrFrameData?.timestamp || 'N/A'} ` +
+          `-> Selected File: ${insatFile || 'N/A'} ` +
+          `-> Obs: ${insatObsTs || 'N/A'} ` +
+          `-> Δt: ${insatDeltaT != null ? insatDeltaT : 'N/A'}m ` +
+          `-> Raster Layer Updated`
+        );
+      }
     }
-  }, [mapLoaded, insatUri, insatBounds, insatObsTs, insatFile, insatDeltaT, dwrFrameData?.timestamp]);
+
+    // 2. Update Real DWR Doppler Radar Scan (Kerala / TERLS C-Band Footprint)
+    if (dwrRadarUri) {
+      const dwrSrc = map.getSource('dwr-radar-src');
+      if (dwrSrc) {
+        try {
+          dwrSrc.updateImage({
+            url: dwrRadarUri,
+            coordinates: [
+              [74.6866, 10.7741],
+              [79.1866, 10.7741],
+              [79.1866, 6.2741],
+              [74.6866, 6.2741]
+            ]
+          });
+        } catch (e) {
+          console.warn('[GisMap] DWR radar raster updateImage error:', e);
+        }
+      }
+    }
+
+    map.triggerRepaint();
+  }, [mapLoaded, insatUri, insatBounds, insatObsTs, insatFile, insatDeltaT, dwrRadarUri, dwrFrameData?.timestamp]);
 
   // ── 7c. Update Optical Flow Motion Vectors ────────────────────────────────
   useEffect(() => {
