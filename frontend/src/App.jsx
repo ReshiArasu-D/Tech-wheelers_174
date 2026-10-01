@@ -74,35 +74,54 @@ export default function App() {
     imd_warnings: 'available'
   });
 
-  // ── 1. WebSocket Live Stream ───────────────────────────────────────────────
+  // ── 1. WebSocket Live Stream with Graceful Fallback ─────────────────────────
   useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL || (import.meta.env.PROD ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/live` : 'ws://localhost:8000/ws/live');
+    // Only connect if explicit VITE_WS_URL is provided, or in local development
+    const wsUrl = import.meta.env.VITE_WS_URL || (!import.meta.env.PROD ? 'ws://localhost:8000/ws/live' : null);
     let socket;
-    try {
-      socket = new WebSocket(wsUrl);
-      socket.onopen = () => console.log('[App] WebSocket connected for Live updates.');
-      socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'live_update' && data.payload) {
-            if (mode === 'live') {
-              setStormState(data.payload);
-              if (data.payload.timestamp) {
-                setCurrentTimestamp(data.payload.timestamp);
+    let pollInterval;
+
+    if (wsUrl) {
+      try {
+        socket = new WebSocket(wsUrl);
+        socket.onopen = () => console.log('[App] WebSocket connected for Live updates.');
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'live_update' && data.payload) {
+              if (mode === 'live') {
+                setStormState(data.payload);
+                if (data.payload.timestamp) {
+                  setCurrentTimestamp(data.payload.timestamp);
+                }
               }
             }
+          } catch (err) {
+            console.error('[App] Error parsing WebSocket message:', err);
           }
-        } catch (err) {
-          console.error('[App] Error parsing WebSocket message:', err);
-        }
-      };
-      socket.onclose = () => console.log('[App] WebSocket disconnected.');
-    } catch (e) {
-      console.warn('[App] WebSocket init error:', e);
+        };
+        socket.onerror = () => {
+          // Gracefully suppress noisy connection failure on serverless/static environments
+          try { socket.close(); } catch (_) {}
+        };
+        socket.onclose = () => console.log('[App] WebSocket disconnected.');
+      } catch (e) {
+        // Suppress init error
+      }
+    } else if (mode === 'live') {
+      // In production without WebSocket server, gracefully poll latest storms every 30s
+      pollInterval = setInterval(() => {
+        api.getStorms().then(storms => {
+          if (storms && storms.length > 0) {
+            setStormState(prev => ({ ...(prev || {}), storms }));
+          }
+        }).catch(() => {});
+      }, 30000);
     }
 
     return () => {
       if (socket) socket.close();
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, [mode]);
 

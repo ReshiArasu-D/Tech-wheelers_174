@@ -1,7 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Map as MapLibreMap, NavigationControl, Marker } from 'maplibre-gl';
+import { Map as MapLibreMap, NavigationControl, Marker, setWorkerUrl } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../services/api';
+
+if (typeof window !== 'undefined' && import.meta.env.PROD) {
+  setWorkerUrl('/assets/maplibre-gl-worker.mjs');
+}
 
 const TERLS_LAT = 8.5241;
 const TERLS_LON = 76.9366;
@@ -721,19 +725,52 @@ export default function GisMap({
         letter-spacing: 0.2px;
       `;
 
+      const getMarineDescriptor = (latitude, longitude) => {
+        if (latitude == null || longitude == null) return null;
+        const latF = Number(latitude);
+        const lonF = Number(longitude);
+        if (latF >= 5.0 && latF <= 23.5 && lonF >= 80.0 && lonF <= 96.0) {
+          if (lonF >= 92.5 && latF <= 15.0) return 'Andaman Sea — Open Waters';
+          if (latF >= 19.0) return 'North Bay of Bengal — Open Waters';
+          if (latF >= 14.0) return 'Central Bay of Bengal — Open Waters';
+          return 'South Bay of Bengal — Open Waters';
+        }
+        if (latF >= 5.0 && latF <= 25.0 && lonF >= 55.0 && lonF <= 77.0) {
+          if (latF <= 12.0 && lonF >= 71.0) return 'Lakshadweep Sea — Open Waters';
+          if (latF >= 18.0) return 'North Arabian Sea — Open Waters';
+          return 'Arabian Sea — Open Waters';
+        }
+        if (latF >= -5.0 && latF < 5.0 && lonF >= 60.0 && lonF <= 100.0) {
+          return 'Indian Ocean — Open Waters';
+        }
+        return null;
+      };
+
       const initialName = s.location_name || s.location || null;
-      if (initialName && initialName.trim() !== '') {
+      if (initialName && initialName.trim() !== '' && initialName !== 'UNAVAILABLE') {
         nameEl.textContent = initialName;
       } else {
-        nameEl.textContent = '...';
-        // Asynchronously resolve area name dynamically from real backend OSM reverse geocoder
-        api.geocode(lat, lon)
-          .then(res => {
-            nameEl.textContent = (res?.area_name && res.area_name.trim() !== '') ? res.area_name : 'UNAVAILABLE';
-          })
-          .catch(() => {
-            nameEl.textContent = 'UNAVAILABLE';
-          });
+        const marineFallback = getMarineDescriptor(lat, lon);
+        if (marineFallback) {
+          nameEl.textContent = marineFallback;
+        } else if (initialName && initialName.trim() !== '') {
+          nameEl.textContent = initialName;
+        } else {
+          nameEl.textContent = '...';
+          // Asynchronously resolve area name dynamically from real backend OSM reverse geocoder
+          api.geocode(lat, lon)
+            .then(res => {
+              const resName = res?.area_name && res.area_name.trim() !== '' ? res.area_name : null;
+              if (resName && resName !== 'UNAVAILABLE') {
+                nameEl.textContent = resName;
+              } else {
+                nameEl.textContent = getMarineDescriptor(lat, lon) || 'UNAVAILABLE';
+              }
+            })
+            .catch(() => {
+              nameEl.textContent = getMarineDescriptor(lat, lon) || 'UNAVAILABLE';
+            });
+        }
       }
 
       label.appendChild(dotEl);
