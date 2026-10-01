@@ -1,5 +1,28 @@
-[tool.fastapi]
-entrypoint = "backend.app.main:app"
+[project]
+name = "co-nowcast"
+version = "0.1.0"
+description = "CO-NOWCAST Backend API"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.1.0",
+    "sqlalchemy>=2.0.35",
+    "aiosqlite>=0.20.0",
+    "numpy>=1.26.0",
+    "scipy>=1.14.0",
+    "pandas>=2.2.0",
+    "h5py>=3.12.0",
+    "opencv-python-headless>=4.10.0",
+    "torch>=2.2.0",
+    "shapely>=2.0.0",
+    "pyproj>=3.7.0",
+    "requests>=2.32.0",
+    "httpx>=0.28.0",
+    "python-multipart>=0.0.12",
+    "google-genai>=0.1.1",
+]
 
-[tool.vercel]
+[tool.fastapi]
 entrypoint = "backend.app.main:app"
