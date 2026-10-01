@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from './components/Header';
 import SensorStrip from './components/SensorStrip';
 import LeftToolbar from './components/LeftToolbar';
@@ -253,10 +253,17 @@ export default function App() {
     }
   };
 
-  // Combined storms list: in DWR replay mode, use dwrFrameData.storms
-  const displayStorms = (mode === 'replay' && dwrFrameData?.storms?.length)
-    ? dwrFrameData.storms
-    : (stormState?.storms || []);
+  // Combined storms list: include BOTH DWR radar storms (Kerala) and INSAT satellite storms (Bay of Bengal)
+  const displayStorms = useMemo(() => {
+    const dwrStorms = dwrFrameData?.storms || [];
+    const satStorms = stormState?.storms || [];
+    const map = new Map();
+    dwrStorms.forEach(s => map.set(s.storm_id, s));
+    satStorms.forEach(s => {
+      if (!map.has(s.storm_id)) map.set(s.storm_id, s);
+    });
+    return Array.from(map.values());
+  }, [dwrFrameData?.storms, stormState?.storms]);
 
   return (
     <div style={{

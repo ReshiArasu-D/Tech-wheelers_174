@@ -75,9 +75,12 @@ export default function GisMap({
   const [initError, setInitError] = useState(null);
 
   useEffect(() => {
-    stormsRef.current = (dwrFrameData?.storms && dwrFrameData.storms.length > 0)
-      ? dwrFrameData.storms
-      : storms;
+    const dMap = new Map();
+    (dwrFrameData?.storms || []).forEach(s => dMap.set(s.storm_id, s));
+    (storms || []).forEach(s => {
+      if (!dMap.has(s.storm_id)) dMap.set(s.storm_id, s);
+    });
+    stormsRef.current = Array.from(dMap.values());
   }, [dwrFrameData, storms]);
 
   // ── 1. Initialize MapLibre with High-Resolution Satellite Hybrid ───────────
@@ -526,10 +529,13 @@ export default function GisMap({
     const trackLineFeats = [];
     const trackNodeFeats = [];
 
-    // Prioritize DWR storm cells if in DWR historical replay
-    const stormList = (dwrFrameData?.storms && dwrFrameData.storms.length > 0)
-      ? dwrFrameData.storms
-      : storms;
+    // Combine both DWR radar storms (Kerala) and INSAT satellite storm cells (Bay of Bengal)
+    const stormMap = new Map();
+    (dwrFrameData?.storms || []).forEach(s => stormMap.set(s.storm_id, s));
+    (storms || []).forEach(s => {
+      if (!stormMap.has(s.storm_id)) stormMap.set(s.storm_id, s);
+    });
+    const stormList = Array.from(stormMap.values());
 
     stormList.forEach(s => {
       const coords = s.polygon_geojson?.coordinates?.[0];
@@ -628,9 +634,12 @@ export default function GisMap({
 
     if (visibleLayers.storms === false) return;
 
-    const stormList = (dwrFrameData?.storms && dwrFrameData.storms.length > 0)
-      ? dwrFrameData.storms
-      : storms;
+    const dotMap = new Map();
+    (dwrFrameData?.storms || []).forEach(s => dotMap.set(s.storm_id, s));
+    (storms || []).forEach(s => {
+      if (!dotMap.has(s.storm_id)) dotMap.set(s.storm_id, s);
+    });
+    const stormList = Array.from(dotMap.values());
 
     stormList.forEach(s => {
       const lat = s.centroid?.lat;

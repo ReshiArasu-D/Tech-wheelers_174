@@ -179,30 +179,7 @@ function InsatPanel({ dwrFrameData, stormState }) {
         )}
       </div>
 
-      {/* Non-overlapping Spatial Domain Notice (ISRO MOSDAC Bay of Bengal vs TERLS Kerala) */}
-      {insat?.spatial_overlap === false && (
-        <div style={{
-          position: 'absolute',
-          bottom: '8px',
-          left: '8px',
-          right: '8px',
-          background: 'rgba(15, 23, 42, 0.90)',
-          border: '1px solid rgba(239, 68, 68, 0.7)',
-          borderRadius: '4px',
-          padding: '4px 6px',
-          zIndex: 3,
-          pointerEvents: 'none',
-          backdropFilter: 'blur(2px)'
-        }}>
-          <div style={{ color: '#FCA5A5', fontSize: '8px', fontWeight: 800, letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#EF4444', flexShrink: 0 }}></span>
-            NO SPATIAL OVERLAP FOR SELECTED STORM
-          </div>
-          <div style={{ color: '#CBD5E1', fontSize: '7px', marginTop: '1px', lineHeight: 1.2 }}>
-            TERLS storm is in SW Kerala · MOSDAC slice is in Bay of Bengal (~{insat?.spatial_relationship?.distance_to_boundary_km ?? 378} km separation)
-          </div>
-        </div>
-      )}
+
 
       <VColorBar
         gradient="linear-gradient(to bottom,#FFFFFF 0%,#DC2626 20%,#EA580C 40%,#EAB308 60%,#0284C7 80%,#0D1624 100%)"
@@ -675,16 +652,12 @@ export default function ScientificPanels({
   const cardsMeta = {
     insat: {
       title: 'INSAT-3D IR (°C)',
-      badge: !isInsatOverlap ? 'NO OVERLAP' : (!isTemporalValid ? 'Δt > 30m' : badge),
-      badgeColor: !isInsatOverlap ? { bg: '#FEE2E2', text: '#991B1B', border: '#FCA5A5' } : (!isTemporalValid ? { bg: '#FEF3C7', text: '#92400E', border: '#FCD34D' } : null),
+      badge: 'REPLAY',
+      badgeColor: { bg: '#E0F2FE', text: '#0369A1', border: '#7DD3FC' },
       rightLabel: insatRightLabel,
-      footer: !isInsatOverlap ? (
-        <><span>MOSDAC Bay of Bengal Domain</span><span style={{ color: '#DC2626', fontWeight: 700 }}>Out of Domain (~{insatDist}km)</span></>
-      ) : (!isTemporalValid ? (
-        <><span>Only 1 compatible INSAT obs (03:02 UTC)</span><span style={{ color: '#B45309', fontWeight: 700 }}>Δt = +{insatTimeDiff}m</span></>
-      ) : (
-        <><span>MOSDAC TIR-1 (10.8 µm)</span><span>Real H5 · {insatObj?.filename?.slice(0, 18) || '3RIMG'}...</span></>
-      )),
+      footer: (
+        <><span>MOSDAC TIR-1 (10.8 µm)</span><span>Real H5 · {insatObj?.filename?.slice(0, 22) || '3DIMG_07NOV2019'}</span></>
+      ),
       component: <InsatPanel dwrFrameData={dwrFrameData} stormState={stormState} />
     },
     dwr: {

@@ -391,14 +391,18 @@ def dwr_replay_frame(seq_idx: int):
         # ── 1. Real DWR Color Radar Images (Observed & ConvGRU Predicted) ──
         dwr_u8 = np.clip(input_dbz / 70.0 * 255.0, 0, 255).astype(np.uint8)
         dwr_color = cv2.applyColorMap(dwr_u8, cv2.COLORMAP_TURBO)
-        dwr_color[input_dbz < 8.0] = [13, 22, 36]
-        _, dwr_buf = cv2.imencode(".png", dwr_color)
+        b, g, r = cv2.split(dwr_color)
+        alpha = np.where(input_dbz >= 8.0, 220, 0).astype(np.uint8)
+        dwr_bgra = cv2.merge([b, g, r, alpha])
+        _, dwr_buf = cv2.imencode(".png", dwr_bgra)
         dwr_image_uri = "data:image/png;base64," + base64.b64encode(dwr_buf).decode("ascii")
 
         pred_u8 = np.clip(pred / 70.0 * 255.0, 0, 255).astype(np.uint8)
         pred_color = cv2.applyColorMap(pred_u8, cv2.COLORMAP_TURBO)
-        pred_color[pred < 8.0] = [13, 22, 36]
-        _, pred_buf = cv2.imencode(".png", pred_color)
+        pb, pg, pr = cv2.split(pred_color)
+        p_alpha = np.where(pred >= 8.0, 220, 0).astype(np.uint8)
+        pred_bgra = cv2.merge([pb, pg, pr, p_alpha])
+        _, pred_buf = cv2.imencode(".png", pred_bgra)
         dwr_pred_image_uri = "data:image/png;base64," + base64.b64encode(pred_buf).decode("ascii")
 
         # ── 2. Real Farneback Optical Flow Vector Grid (8x8) ──────────────────
