@@ -6,9 +6,46 @@ import { api } from '../services/api';
 const TERLS_LAT = 8.5241;
 const TERLS_LON = 76.9366;
 
-// MapTiler Satellite Hybrid — uses VITE_MAPTILER_API_KEY from .env
-const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_API_KEY || 'ehLkmAaIGPEMafg5WhXy';
-const SATELLITE_HYBRID_STYLE = `https://api.maptiler.com/maps/hybrid/style.json?key=${MAPTILER_KEY}`;
+// High-Resolution Universal Satellite Hybrid Basemap (Zero API Key, 100% Reliable Worldwide)
+const SATELLITE_HYBRID_STYLE = {
+  version: 8,
+  sources: {
+    'esri-satellite': {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+      ],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: 'Esri, Maxar, Earthstar Geographics'
+    },
+    'esri-labels': {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'
+      ],
+      tileSize: 256,
+      maxzoom: 19
+    }
+  },
+  layers: [
+    {
+      id: 'background',
+      type: 'background',
+      paint: { 'background-color': '#060d1a' }
+    },
+    {
+      id: 'esri-satellite-layer',
+      type: 'raster',
+      source: 'esri-satellite'
+    },
+    {
+      id: 'esri-labels-layer',
+      type: 'raster',
+      source: 'esri-labels'
+    }
+  ]
+};
 
 export default function GisMap({
   storms = [],
