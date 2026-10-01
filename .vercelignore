@@ -1,0 +1,25 @@
+# Exclude heavy raw datasets and binary archives from Vercel function bundle (5.5+ GB reduction)
+backend/data/insat/
+backend/data/insat/**
+*.h5
+*.zip
+dwr_unzipped/
+backend/data/outputs/
+
+# Exclude frontend (Render hosts frontend at https://now-casr.onrender.com)
+frontend/
+node_modules/
+
+# Exclude notebooks, tests, and documentation
+*.ipynb
+notebooks/
+backend/tests/
+scratch/
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.md
+.git/
+.vscode/
+.idea/
