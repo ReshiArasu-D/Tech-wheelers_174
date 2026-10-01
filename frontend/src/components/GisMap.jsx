@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Map, NavigationControl, Marker } from 'maplibre-gl';
+import { Map as MapLibreMap, NavigationControl, Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../services/api';
 
@@ -89,7 +89,7 @@ export default function GisMap({
 
     let map;
     try {
-      map = new Map({
+      map = new MapLibreMap({
         container: mapContainerRef.current,
         style: SATELLITE_HYBRID_STYLE,
         center: [TERLS_LON + 0.3, TERLS_LAT + 0.8],
