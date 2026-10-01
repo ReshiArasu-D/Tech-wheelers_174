@@ -23,16 +23,20 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from backend.app.config import settings
 
-DATABASE_URL = settings.DATABASE_URL
-if DATABASE_URL.startswith("sqlite:///./"):
-    # Ensure relative path resolves cleanly from backend working directory
-    db_path = DATABASE_URL.replace("sqlite:///./", "")
-    os.makedirs(os.path.dirname(os.path.abspath(db_path)) if os.path.dirname(db_path) else ".", exist_ok=True)
-
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-)
+try:
+    DATABASE_URL = settings.DATABASE_URL
+    if "sqlite:///" in DATABASE_URL and ":memory:" not in DATABASE_URL:
+        db_path = DATABASE_URL.replace("sqlite:///", "")
+        dir_name = os.path.dirname(os.path.abspath(db_path))
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+    )
+except Exception:
+    DATABASE_URL = "sqlite:///:memory:"
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -190,4 +194,7 @@ class AuditLogModel(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
 
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"Warning: Database init fallback ({e})")

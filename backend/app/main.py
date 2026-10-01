@@ -26,18 +26,22 @@ from backend.app.api.dwr_replay import router as dwr_replay_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize SQLite database schema
-    init_db()
-    # Warm up indexing and pipeline cache
-    ts = satellite_service.get_available_timestamps()
-    if ts:
-        print(f"Indexed {len(ts)} real INSAT-3D historical frames.")
-        # Pre-run baseline pipeline for middle frame so first request is immediate
-        try:
-            forecasting_pipeline.run_pipeline_for_frame(ts[min(4, len(ts) - 1)])
-            print("Pre-warmed pipeline state for frame:", ts[min(4, len(ts) - 1)])
-        except Exception as e:
-            print("Pipeline pre-warm note:", e)
+    try:
+        init_db()
+    except Exception as e:
+        print("Database startup note:", e)
+
+    try:
+        ts = satellite_service.get_available_timestamps()
+        if ts:
+            print(f"Indexed {len(ts)} real INSAT-3D historical frames.")
+            try:
+                forecasting_pipeline.run_pipeline_for_frame(ts[min(4, len(ts) - 1)])
+                print("Pre-warmed pipeline state for frame:", ts[min(4, len(ts) - 1)])
+            except Exception as e:
+                print("Pipeline pre-warm note:", e)
+    except Exception as e:
+        print("Satellite service startup note:", e)
     yield
 
 app = FastAPI(
@@ -68,9 +72,12 @@ app.include_router(ai_router)
 app.include_router(ws_router)
 app.include_router(dwr_replay_router)
 
-# ── Serve Built Frontend SPA (Unified Single-Service Deployment on Render) ───
+# ── Serve Built Frontend SPA (Only when not in Vercel backend deployment) ───
+is_vercel = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 frontend_dist = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
-if os.path.isdir(frontend_dist):
+index_html_path = os.path.join(frontend_dist, "index.html")
+
+if not is_vercel and os.path.isfile(index_html_path):
     from fastapi.staticfiles import StaticFiles
     from fastapi.responses import FileResponse
     assets_dir = os.path.join(frontend_dist, "assets")
@@ -83,16 +90,23 @@ if os.path.isdir(frontend_dist):
             file_path = os.path.join(frontend_dist, full_path)
             if os.path.isfile(file_path):
                 return FileResponse(file_path)
-        return FileResponse(os.path.join(frontend_dist, "index.html"))
+        return FileResponse(index_html_path)
 else:
     @app.get("/")
     def root():
         return {
-            "title": "CO-NOWCAST API",
-            "description": "Convective Scale Nowcasting for Thunderstorms, Hail & Cloudbursts (0-6 hr)",
-            "version": "convnowcast-v0.1",
-            "docs_url": "/docs",
-            "health_url": "/health"
+            "title": "CO-NOWCAST Backend API",
+            "description": "Scientific 0–6 hour Convective Scale Nowcasting Decision Support System",
+            "version": "0.1.0",
+            "status": "operational",
+            "endpoints": {
+                "health": "/health",
+                "storms": "/storms",
+                "forecast": "/forecast/{eventId}",
+                "hazards": "/hazards/{eventId}",
+                "risk": "/risk/{eventId}",
+                "docs": "/docs"
+            }
         }
 
 if __name__ == "__main__":
