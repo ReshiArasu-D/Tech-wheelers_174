@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://now-casr.onrender.com' : 'http://localhost:8000');
+const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://co-nowcasr.vercel.app' : 'http://localhost:8000');
 
 async function handleResponse(res) {
   if (!res.ok) {
@@ -86,4 +86,5 @@ export const api = {
   // DWR Historical Replay (real TERLS DWR → Indian ConvGRU)
   getDwrReplayInfo: () => fetch(`${API_BASE}/dwr/replay/info`).then(handleResponse),
   getDwrReplayFrame: (seqIdx) => fetch(`${API_BASE}/dwr/replay/frame/${seqIdx}`).then(handleResponse),
+  geocode: (lat, lon) => fetch(`${API_BASE}/geocode?lat=${lat}&lon=${lon}`).then(handleResponse),
 };

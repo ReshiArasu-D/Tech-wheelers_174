@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Zap, 
@@ -15,8 +15,11 @@ import {
   ShieldAlert,
   AlertTriangle,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  ChevronDown,
+  Bot
 } from 'lucide-react';
+import { api } from '../services/api';
 
 export default function RightStormPanel({
   selectedStorm = null,
@@ -32,6 +35,7 @@ export default function RightStormPanel({
   onClose
 }) {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'forecast' | 'profile' | 'raw'
+  const [dynamicPlace, setDynamicPlace] = useState('UNAVAILABLE');
 
   // Extract dynamic storm attributes directly from backend storm object
   const stormId = selectedStorm?.storm_id || 'UNAVAILABLE';
@@ -44,6 +48,21 @@ export default function RightStormPanel({
   const maxDbz = selectedStorm?.max_dbz != null ? `${selectedStorm.max_dbz} dBZ` : 'N/A';
   const vil = selectedStorm?.vil != null ? `${selectedStorm.vil} kg/m²` : 'N/A';
   const topHeight = selectedStorm?.top_height_km != null ? `${selectedStorm.top_height_km} km` : 'N/A';
+
+  // Dynamic geographic place name: prefer backend resolved location_name, else fetch dynamically via OSM, fallback UNAVAILABLE
+  useEffect(() => {
+    if (selectedStorm?.location_name && selectedStorm.location_name !== 'UNAVAILABLE') {
+      setDynamicPlace(selectedStorm.location_name);
+    } else if (cLat != null && cLon != null) {
+      api.geocode(cLat, cLon)
+        .then(res => setDynamicPlace(res?.area_name || 'UNAVAILABLE'))
+        .catch(() => setDynamicPlace('UNAVAILABLE'));
+    } else {
+      setDynamicPlace('UNAVAILABLE');
+    }
+  }, [selectedStorm?.location_name, cLat, cLon]);
+
+  const placeName = dynamicPlace;
 
   // Real backend hazards from DWR replay frame or stormState
   const backendHazards = dwrFrameData?.hazards || stormState?.hazards || {};
@@ -249,10 +268,13 @@ export default function RightStormPanel({
                 background: '#F8FAFC',
                 border: '1px solid #CBD5E1',
                 borderRadius: '6px',
-                padding: '4px 22px 4px 8px',
+                padding: '5px 28px 5px 10px',
                 cursor: 'pointer',
                 appearance: 'none',
-                outline: 'none'
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
+                outline: 'none',
+                minWidth: '220px'
               }}
             >
               {storms && storms.length > 0 ? (
@@ -265,7 +287,7 @@ export default function RightStormPanel({
                 <option value={stormId}>Storm Cell #{stormId}</option>
               )}
             </select>
-            <span style={{ position: 'absolute', right: '7px', pointerEvents: 'none', fontSize: '0.65rem', color: '#64748B' }}>▼</span>
+            <ChevronDown size={14} style={{ position: 'absolute', right: '8px', pointerEvents: 'none', color: '#64748B' }} />
           </div>
           <span style={{
             fontSize: '0.62rem',
@@ -404,6 +426,14 @@ export default function RightStormPanel({
                   <span style={{ color: '#64748B' }}>Location</span>
                   <span style={{ color: '#0F172A', fontWeight: 700, fontFamily: 'monospace' }}>
                     {cLat != null && cLon != null ? `${cLat.toFixed(2)}°N, ${cLon.toFixed(2)}°E` : 'N/A'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem' }}>
+                  <span style={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <MapPin size={10} /> Nearest Area
+                  </span>
+                  <span style={{ color: '#7C3AED', fontWeight: 700, maxWidth: '160px', textAlign: 'right' }}>
+                    {placeName}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem' }}>
@@ -760,6 +790,40 @@ export default function RightStormPanel({
                 </div>
               )}
             </div>
+
+            {/* 7b. MULTI-SENSOR FUSION INTEGRITY STATUS */}
+            {dwrFrameData?.fusion_status && (
+              <div style={{
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: '8px',
+                padding: '10px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0F172A' }}>
+                    Multi-Sensor Fusion Integrity
+                  </span>
+                  <span style={{
+                    fontSize: '8px',
+                    fontWeight: 800,
+                    padding: '2px 6px',
+                    borderRadius: '3px',
+                    background: (dwrFrameData.fusion_status.dwr_insat_spatial_overlap && dwrFrameData.fusion_status.dwr_insat_temporal_overlap !== false && dwrFrameData.fusion_status.mode?.includes('FULL')) ? '#DCFCE7' : '#FEF3C7',
+                    color: (dwrFrameData.fusion_status.dwr_insat_spatial_overlap && dwrFrameData.fusion_status.dwr_insat_temporal_overlap !== false && dwrFrameData.fusion_status.mode?.includes('FULL')) ? '#15803D' : '#92400E',
+                    border: `1px solid ${(dwrFrameData.fusion_status.dwr_insat_spatial_overlap && dwrFrameData.fusion_status.dwr_insat_temporal_overlap !== false && dwrFrameData.fusion_status.mode?.includes('FULL')) ? '#86EFAC' : '#FCD34D'}`
+                  }}>
+                    {(dwrFrameData.fusion_status.dwr_insat_spatial_overlap && dwrFrameData.fusion_status.dwr_insat_temporal_overlap !== false && dwrFrameData.fusion_status.mode?.includes('FULL')) ? 'FULL FUSION' : 'RADAR-ANCHORED'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.71rem', color: '#1E293B', fontWeight: 700 }}>
+                  {dwrFrameData.fusion_status.mode}
+                </div>
+                <div style={{ fontSize: '0.67rem', color: '#64748B', marginTop: '4px', lineHeight: 1.35 }}>
+                  {dwrFrameData.fusion_status.eligibility}
+                </div>
+              </div>
+            )}
 
             {/* 8. OPERATIONAL ALERT / HITL SIGN-OFF STATUS */}
             <div style={{

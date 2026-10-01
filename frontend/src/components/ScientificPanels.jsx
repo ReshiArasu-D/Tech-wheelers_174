@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Maximize2, X } from 'lucide-react';
 
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -22,19 +23,67 @@ function fmtTs(ts) {
   } catch { return ts.substring(0,16).replace('T',' '); }
 }
 
-function PanelCard({ title, badge, rightLabel, footer, children }) {
+function PanelCard({ title, badge, badgeColor, rightLabel, footer, onExpand, children }) {
   return (
-    <div style={{
-      background:'#FFFFFF', border:'1px solid #E2E8F0', borderRadius:'8px',
-      padding:'8px 10px', display:'flex', flexDirection:'column',
-      justifyContent:'space-between', position:'relative',
-      overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.03)'
-    }}>
+    <div
+      onClick={onExpand}
+      title={onExpand ? "Click to expand visualization" : undefined}
+      style={{
+        background:'#FFFFFF', border:'1px solid #E2E8F0', borderRadius:'8px',
+        padding:'8px 10px', display:'flex', flexDirection:'column',
+        justifyContent:'space-between', position:'relative',
+        overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.03)',
+        cursor: onExpand ? 'pointer' : 'default',
+        transition: 'border-color 0.15s ease, box-shadow 0.15s ease'
+      }}
+      onMouseEnter={(e) => {
+        if (onExpand) {
+          e.currentTarget.style.borderColor = '#93C5FD';
+          e.currentTarget.style.boxShadow = '0 3px 8px rgba(37, 99, 235, 0.12)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (onExpand) {
+          e.currentTarget.style.borderColor = '#E2E8F0';
+          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.03)';
+        }
+      }}
+    >
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
         <span style={{ fontSize:'11px', fontWeight:800, color:'#0F172A' }}>{title}</span>
         <div style={{ display:'flex', alignItems:'center', gap:'5px' }}>
-          {badge && <span style={{ fontSize:'8px', fontWeight:800, padding:'1px 5px', borderRadius:'3px', background:'#DBEAFE', color:'#1E40AF', border:'1px solid #93C5FD' }}>{badge}</span>}
+          {badge && (
+            <span style={{
+              fontSize:'8px',
+              fontWeight:800,
+              padding:'1px 5px',
+              borderRadius:'3px',
+              background: badgeColor?.bg || '#DBEAFE',
+              color: badgeColor?.text || '#1E40AF',
+              border: `1px solid ${badgeColor?.border || '#93C5FD'}`
+            }}>
+              {badge}
+            </span>
+          )}
           {rightLabel && <span style={{ fontSize:'9px', color:'#64748B', fontFamily:'monospace' }}>{rightLabel}</span>}
+          {onExpand && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '16px',
+                height: '16px',
+                borderRadius: '3px',
+                background: '#F1F5F9',
+                color: '#64748B',
+                marginLeft: '2px'
+              }}
+              title="Expand view"
+            >
+              <Maximize2 size={10} />
+            </span>
+          )}
         </div>
       </div>
       <div style={{ flex:1, minHeight:0, position:'relative', margin:'4px 0' }}>{children}</div>
@@ -70,11 +119,26 @@ function InsatPanel({ dwrFrameData, stormState }) {
   const coolingRate = storm?.cooling_rate_k_hr ?? null;
   const obsTs = insat?.obs_timestamp ? fmtTs(insat.obs_timestamp) : null;
   const imageUri = insat?.image_data_uri;
+  const timeDiffMin = insat?.time_difference_minutes;
+  const isTemporalValid = insat?.temporal_overlap !== false;
+
+  useEffect(() => {
+    if (insat) {
+      console.log(
+        `[SCIENTIFIC-PANELS INSAT] DWR: ${dwrFrameData?.timestamp || 'N/A'} ` +
+        `-> File: ${insat?.filename || 'N/A'} ` +
+        `-> Obs: ${insat?.obs_timestamp || 'N/A'} ` +
+        `-> Δt: ${timeDiffMin != null ? timeDiffMin : 'N/A'}m ` +
+        `-> Raster Present: ${Boolean(imageUri)}`
+      );
+    }
+  }, [dwrFrameData?.timestamp, insat?.obs_timestamp, insat?.filename, imageUri, timeDiffMin]);
 
   return (
     <DarkCanvas>
       {imageUri ? (
         <img
+          key={insat?.obs_timestamp || insat?.filename || 'insat-raster-img'}
           src={imageUri}
           alt="Real INSAT-3D/3DR TIR-1 Observation"
           style={{
@@ -105,10 +169,41 @@ function InsatPanel({ dwrFrameData, stormState }) {
         )}
         {obsTs && (
           <div style={{ color: '#93C5FD', fontSize: '7px', fontFamily: 'monospace', marginTop: '2px', textShadow: '0 1px 2px #000' }}>
-            Obs: {obsTs}
+            Obs: {obsTs} {timeDiffMin != null ? `(Δt: +${timeDiffMin}m)` : ''}
+          </div>
+        )}
+        {!isTemporalValid && (
+          <div style={{ color: '#F59E0B', fontSize: '6.5px', fontFamily: 'monospace', fontWeight: 800, marginTop: '2px', textShadow: '0 1px 2px #000' }}>
+            [Δt &gt; 30m MISMATCH]
           </div>
         )}
       </div>
+
+      {/* Non-overlapping Spatial Domain Notice (ISRO MOSDAC Bay of Bengal vs TERLS Kerala) */}
+      {insat?.spatial_overlap === false && (
+        <div style={{
+          position: 'absolute',
+          bottom: '8px',
+          left: '8px',
+          right: '8px',
+          background: 'rgba(15, 23, 42, 0.90)',
+          border: '1px solid rgba(239, 68, 68, 0.7)',
+          borderRadius: '4px',
+          padding: '4px 6px',
+          zIndex: 3,
+          pointerEvents: 'none',
+          backdropFilter: 'blur(2px)'
+        }}>
+          <div style={{ color: '#FCA5A5', fontSize: '8px', fontWeight: 800, letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#EF4444', flexShrink: 0 }}></span>
+            NO SPATIAL OVERLAP FOR SELECTED STORM
+          </div>
+          <div style={{ color: '#CBD5E1', fontSize: '7px', marginTop: '1px', lineHeight: 1.2 }}>
+            TERLS storm is in SW Kerala · MOSDAC slice is in Bay of Bengal (~{insat?.spatial_relationship?.distance_to_boundary_km ?? 378} km separation)
+          </div>
+        </div>
+      )}
+
       <VColorBar
         gradient="linear-gradient(to bottom,#FFFFFF 0%,#DC2626 20%,#EA580C 40%,#EAB308 60%,#0284C7 80%,#0D1624 100%)"
         labels={['-20', '-40', '-60', '-80']}
@@ -118,57 +213,292 @@ function InsatPanel({ dwrFrameData, stormState }) {
 }
 
 // ── Panel 2: DWR Reflectivity (Real TERLS Radar Replay) ───────────────────────
-function DwrPanel({ dwrFrameData, stormState }) {
+function DwrPanel({ dwrFrameData, stormState, isExpanded = false }) {
   const storms = dwrFrameData?.storms || stormState?.storms || [];
   const maxDbz = storms.length > 0 ? Math.max(...storms.map(s => s.max_dbz ?? 0)) : (dwrFrameData?.dbz_max_pred ? Math.round(dwrFrameData.dbz_max_pred * 70) : null);
   const imageUri = dwrFrameData?.dwr_image_data_uri;
 
+  // Helper to colorize radar cell dots by intensity tier
+  const getCellColor = (dbz) => {
+    if (dbz >= 45) return '#dc2626'; // Severe (Red)
+    if (dbz >= 35) return '#f59e0b'; // Heavy (Yellow/Amber)
+    if (dbz >= 25) return '#16a34a'; // Moderate (Green)
+    return '#0284c7';               // Light (Blue)
+  };
+
   return (
-    <DarkCanvas>
-      {imageUri ? (
-        <img
-          src={imageUri}
-          alt="TERLS C-Band Radar Reflectivity"
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            position: 'absolute',
-            top: 0,
-            left: 0
-          }}
-        />
-      ) : (
-        <div style={{ color: '#64748B', fontSize: '9px', fontFamily: 'monospace' }}>
-          LOADING TERLS RADAR SCAN...
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
+      {/* Radar Canvas Display */}
+      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+        <DarkCanvas>
+          {imageUri ? (
+            <img
+              src={imageUri}
+              alt="TERLS C-Band Radar Reflectivity"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                position: 'absolute',
+                top: 0,
+                left: 0
+              }}
+            />
+          ) : (
+            <div style={{ color: '#64748B', fontSize: '9px', fontFamily: 'monospace' }}>
+              LOADING TERLS RADAR SCAN...
+            </div>
+          )}
+
+          {/* Range rings, center radar station, and detected storm dots */}
+          <svg
+            width="100%"
+            height="100%"
+            viewBox="0 0 180 80"
+            preserveAspectRatio="xMidYMid meet"
+            style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+          >
+            {/* Concentric distance rings: 80 km, 165 km, 250 km */}
+            {[0.33, 0.66, 1.0].map((r, i) => (
+              <circle
+                key={i}
+                cx="90"
+                cy="40"
+                r={r * 36}
+                fill="none"
+                stroke="rgba(255,255,255,0.22)"
+                strokeWidth={isExpanded ? "0.4" : "0.6"}
+                strokeDasharray="2 2"
+              />
+            ))}
+            {/* Range distance labels */}
+            <text x="91" y="28.5" fill="rgba(255,255,255,0.4)" fontSize={isExpanded ? "2.5" : "3"} fontFamily="monospace">80km</text>
+            <text x="91" y="16.5" fill="rgba(255,255,255,0.4)" fontSize={isExpanded ? "2.5" : "3"} fontFamily="monospace">165km</text>
+            <text x="91" y="4.5" fill="rgba(255,255,255,0.4)" fontSize={isExpanded ? "2.5" : "3"} fontFamily="monospace">250km</text>
+
+            {/* Radar crosshairs */}
+            <line x1="90" y1="4" x2="90" y2="76" stroke="rgba(255,255,255,0.18)" strokeWidth={isExpanded ? "0.4" : "0.6"} />
+            <line x1="54" y1="40" x2="126" y2="40" stroke="rgba(255,255,255,0.18)" strokeWidth={isExpanded ? "0.4" : "0.6"} />
+
+            {/* Center Radar Station: TERLS C-Band (Thiruvananthapuram, ISRO origin) */}
+            <circle cx="90" cy="40" r={isExpanded ? "2.5" : "2"} fill="none" stroke="#38bdf8" strokeWidth={isExpanded ? "0.5" : "0.7"} strokeDasharray="1 1" />
+            <circle cx="90" cy="40" r={isExpanded ? "1.2" : "1.0"} fill="#38bdf8" stroke="#ffffff" strokeWidth="0.5" />
+
+            {/* Detected radar cell centroid dots (Color matches cell's peak dBZ severity tier) */}
+            {storms.map((s, idx) => {
+              if (!s.centroid) return null;
+              const dLat = (s.centroid.lat - 8.5241) / 2.25;
+              const dLon = (s.centroid.lon - 76.9366) / 2.25;
+              const cx = 90 + dLon * 36;
+              const cy = 40 - dLat * 36;
+              const dbz = s.max_dbz ?? 30;
+              const dotColor = getCellColor(dbz);
+              const rCore = isExpanded ? 1.5 : 2.0;
+
+              return (
+                <g key={s.storm_id || idx}>
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={rCore + 1.2}
+                    fill="none"
+                    stroke={dotColor}
+                    strokeWidth={isExpanded ? "0.5" : "0.7"}
+                    opacity="0.85"
+                  />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={rCore}
+                    fill={dotColor}
+                    stroke="#ffffff"
+                    strokeWidth={isExpanded ? "0.4" : "0.6"}
+                  />
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* Telemetry labels */}
+          <div style={{ position: 'absolute', top: '6px', left: '8px', zIndex: 2, pointerEvents: 'none' }}>
+            {maxDbz != null && (
+              <div style={{ color: '#F1F5F9', fontSize: isExpanded ? '11px' : '9px', fontFamily: 'monospace', fontWeight: 700, textShadow: '0 1px 2px #000' }}>
+                {maxDbz} dBZ
+              </div>
+            )}
+            {storms.length > 0 && (
+              <div style={{ color: '#FCD34D', fontSize: isExpanded ? '9px' : '7.5px', fontFamily: 'monospace', textShadow: '0 1px 2px #000' }}>
+                {storms.length} cell{storms.length > 1 ? 's' : ''} detected
+              </div>
+            )}
+          </div>
+
+          <VColorBar
+            gradient="linear-gradient(to bottom,#990000 0%,#cc6600 20%,#ccaa00 40%,#009900 60%,#005ce6 80%,#001a66 100%)"
+            labels={['60', '50', '40', '30', '20', '10']}
+          />
+        </DarkCanvas>
+      </div>
+
+      {/* Explanatory Legend Area: Explaining what dots and colors represent ONLY when expanded */}
+      {isExpanded && (
+        /* EXPANDED MODAL VIEW LEGEND (Rich, detailed breakdown like a chart legend) */
+        <div style={{
+          padding: '12px 18px',
+          background: '#F8FAFC',
+          borderTop: '1px solid #E2E8F0',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          flexShrink: 0
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Radar Echo & Cell Intensity Legend
+              </span>
+              <span style={{ fontSize: '10.5px', color: '#64748B', fontWeight: 500 }}>
+                (Each color indicates precipitation rate & convective severity)
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: '#2563EB', fontWeight: 600 }}>
+              ● Click/touch any dot on main map to inspect full cell kinematics
+            </div>
+          </div>
+
+          {/* 4-Color Swatch Grid (Piechart-style breakdown) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '10px'
+          }}>
+            {/* 1. Light Rain */}
+            <div style={{
+              background: '#FFFFFF',
+              border: '1px solid #BAE6FD',
+              borderLeft: '4px solid #0284C7',
+              borderRadius: '6px',
+              padding: '8px 10px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#0284C7', display: 'inline-block' }} />
+                <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#0369A1' }}>Light Rain</span>
+                <span style={{ fontSize: '10px', color: '#0284C7', fontWeight: 600, marginLeft: 'auto' }}>&lt; 25 dBZ</span>
+              </div>
+              <div style={{ fontSize: '10px', color: '#475569', lineHeight: 1.3 }}>
+                Rainfall &lt; 2.5 mm/h · Initial condensation or drizzle
+              </div>
+            </div>
+
+            {/* 2. Moderate Rain */}
+            <div style={{
+              background: '#FFFFFF',
+              border: '1px solid #BBF7D0',
+              borderLeft: '4px solid #16A34A',
+              borderRadius: '6px',
+              padding: '8px 10px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#16A34A', display: 'inline-block' }} />
+                <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#15803D' }}>Moderate Rain</span>
+                <span style={{ fontSize: '10px', color: '#16A34A', fontWeight: 600, marginLeft: 'auto' }}>25–35 dBZ</span>
+              </div>
+              <div style={{ fontSize: '10px', color: '#475569', lineHeight: 1.3 }}>
+                Rainfall 2.5–10 mm/h · Established rain shower cell
+              </div>
+            </div>
+
+            {/* 3. Heavy Rain */}
+            <div style={{
+              background: '#FFFFFF',
+              border: '1px solid #FDE68A',
+              borderLeft: '4px solid #F59E0B',
+              borderRadius: '6px',
+              padding: '8px 10px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#F59E0B', display: 'inline-block' }} />
+                <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#B45309' }}>Heavy Rain</span>
+                <span style={{ fontSize: '10px', color: '#D97706', fontWeight: 600, marginLeft: 'auto' }}>35–45 dBZ</span>
+              </div>
+              <div style={{ fontSize: '10px', color: '#475569', lineHeight: 1.3 }}>
+                Rainfall 10–30 mm/h · Deep convective core & downpours
+              </div>
+            </div>
+
+            {/* 4. Severe Thunderstorm */}
+            <div style={{
+              background: '#FFFFFF',
+              border: '1px solid #FECACA',
+              borderLeft: '4px solid #DC2626',
+              borderRadius: '6px',
+              padding: '8px 10px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#DC2626', display: 'inline-block' }} />
+                <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#B91C1C' }}>Severe Storm</span>
+                <span style={{ fontSize: '10px', color: '#DC2626', fontWeight: 600, marginLeft: 'auto' }}>≥ 45 dBZ</span>
+              </div>
+              <div style={{ fontSize: '10px', color: '#475569', lineHeight: 1.3 }}>
+                Rainfall &gt; 30 mm/h · Intense updraft, hail & lightning risk
+              </div>
+            </div>
+          </div>
+
+          {/* Symbols Guide */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: '6px',
+            borderTop: '1px solid #E2E8F0',
+            fontSize: '11px',
+            color: '#64748B'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: '#0284C7',
+                  border: '1.5px solid #FFFFFF',
+                  boxShadow: '0 0 0 1px #0284C7'
+                }} />
+                <span><strong style={{ color: '#0F172A' }}>Colored Dots:</strong> Detected Storm Cells (Centroids)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: '#38BDF8',
+                  border: '1.5px solid #FFFFFF'
+                }} />
+                <span><strong style={{ color: '#0F172A' }}>Center Dot:</strong> TERLS Radar Origin (Thiruvananthapuram)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{
+                  display: 'inline-block',
+                  width: '12px',
+                  height: '1px',
+                  borderTop: '1.5px dashed #94A3B8'
+                }} />
+                <span><strong style={{ color: '#0F172A' }}>Dashed Rings:</strong> 80 km, 165 km, 250 km Range Markers</span>
+              </div>
+            </div>
+            <div style={{ color: '#0F172A', fontWeight: 600, fontFamily: 'monospace' }}>
+              {storms.length} cell{storms.length > 1 ? 's' : ''} in scan
+            </div>
+          </div>
         </div>
       )}
-      {/* Range rings overlay */}
-      <svg width="100%" height="100%" viewBox="0 0 180 80" preserveAspectRatio="xMidYMid meet" style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
-        {[0.33, 0.66, 1.0].map((r, i) => (
-          <circle key={i} cx="90" cy="40" r={r * 36} fill="none" stroke="rgba(255,255,255,0.20)" strokeWidth="0.6" strokeDasharray="2 2" />
-        ))}
-        <line x1="90" y1="4" x2="90" y2="76" stroke="rgba(255,255,255,0.15)" strokeWidth="0.6" />
-        <line x1="54" y1="40" x2="126" y2="40" stroke="rgba(255,255,255,0.15)" strokeWidth="0.6" />
-      </svg>
-      {/* Telemetry labels */}
-      <div style={{ position: 'absolute', top: '6px', left: '8px', zIndex: 2, pointerEvents: 'none' }}>
-        {maxDbz != null && (
-          <div style={{ color: '#F1F5F9', fontSize: '9px', fontFamily: 'monospace', fontWeight: 700, textShadow: '0 1px 2px #000' }}>
-            {maxDbz} dBZ
-          </div>
-        )}
-        {storms.length > 0 && (
-          <div style={{ color: '#FCD34D', fontSize: '7.5px', fontFamily: 'monospace', textShadow: '0 1px 2px #000' }}>
-            {storms.length} cell{storms.length > 1 ? 's' : ''} detected
-          </div>
-        )}
-      </div>
-      <VColorBar
-        gradient="linear-gradient(to bottom,#990000 0%,#cc6600 20%,#ccaa00 40%,#009900 60%,#005ce6 80%,#001a66 100%)"
-        labels={['60', '50', '40', '30', '20', '10']}
-      />
-    </DarkCanvas>
+    </div>
   );
 }
 
@@ -320,61 +650,236 @@ export default function ScientificPanels({
     ? `${effectiveStorm.motion.speed_kmh?.toFixed(0) ?? '—'} km/h · ${effectiveStorm.motion.bearing_cardinal ?? ''}`
     : 'Storm motion vectors';
 
-  // Display observation time if half-hourly scan differs from 10-min replay time
-  const insatObsTs = dwrFrameData?.insat_frame?.obs_timestamp || stormState?.sensor_data?.satellite?.obs_timestamp;
-  const insatRightLabel = insatObsTs && insatObsTs !== currentTimestamp
-    ? `${fmtTs(insatObsTs)} (Obs)`
+  // Display observation time and Delta_t if available
+  const insatObj = dwrFrameData?.insat_frame || stormState?.sensor_data?.satellite;
+  const insatObsTs = insatObj?.obs_timestamp;
+  const insatTimeDiff = insatObj?.time_difference_minutes;
+  const isTemporalValid = insatObj?.temporal_overlap !== false;
+  const insatRightLabel = insatObsTs
+    ? `${fmtTs(insatObsTs)} (Δt: ${insatTimeDiff != null ? (insatTimeDiff > 0 ? `+${insatTimeDiff}` : insatTimeDiff) : '0'}m)`
     : tsFormatted;
 
+  const [expandedCard, setExpandedCard] = useState(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setExpandedCard(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const isInsatOverlap = insatObj?.spatial_overlap !== false;
+  const insatDist = insatObj?.spatial_relationship?.distance_to_boundary_km ?? 378;
+
+  const cardsMeta = {
+    insat: {
+      title: 'INSAT-3D IR (°C)',
+      badge: !isInsatOverlap ? 'NO OVERLAP' : (!isTemporalValid ? 'Δt > 30m' : badge),
+      badgeColor: !isInsatOverlap ? { bg: '#FEE2E2', text: '#991B1B', border: '#FCA5A5' } : (!isTemporalValid ? { bg: '#FEF3C7', text: '#92400E', border: '#FCD34D' } : null),
+      rightLabel: insatRightLabel,
+      footer: !isInsatOverlap ? (
+        <><span>MOSDAC Bay of Bengal Domain</span><span style={{ color: '#DC2626', fontWeight: 700 }}>Out of Domain (~{insatDist}km)</span></>
+      ) : (!isTemporalValid ? (
+        <><span>Only 1 compatible INSAT obs (03:02 UTC)</span><span style={{ color: '#B45309', fontWeight: 700 }}>Δt = +{insatTimeDiff}m</span></>
+      ) : (
+        <><span>MOSDAC TIR-1 (10.8 µm)</span><span>Real H5 · {insatObj?.filename?.slice(0, 18) || '3RIMG'}...</span></>
+      )),
+      component: <InsatPanel dwrFrameData={dwrFrameData} stormState={stormState} />
+    },
+    dwr: {
+      title: 'DWR Reflectivity (dBZ)',
+      badge,
+      rightLabel: tsFormatted,
+      footer: <><span>TERLS C-Band (250 km)</span><span>ConvGRU · 30,369 params</span></>,
+      component: <DwrPanel dwrFrameData={dwrFrameData} stormState={stormState} isExpanded={true} />
+    },
+    cross_section: {
+      title: 'Vertical Cross-section (DWR)',
+      badge: null,
+      rightLabel: topHeightLabel,
+      footer: <><span>Height (km) vs Distance (km)</span><span>Volumetric Scan Extent</span></>,
+      component: <CrossSection selectedStorm={effectiveStorm} dwrFrameData={dwrFrameData} />
+    },
+    motion: {
+      title: 'Motion Vectors (Optical Flow)',
+      badge: null,
+      rightLabel: 'Speed (km/h)',
+      footer: <><span>Centroid · {motionLabel}</span><span>Farneback Optical Flow</span></>,
+      component: <MotionPanel dwrFrameData={dwrFrameData} stormState={stormState} />
+    }
+  };
+
+  const activeExpanded = expandedCard ? cardsMeta[expandedCard] : null;
+
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(4, 1fr)',
-      gap: '8px',
-      padding: '7px 16px',
-      background: '#F5F7FA',
-      borderTop: '1px solid #E2E8F0',
-      borderBottom: '1px solid #E2E8F0',
-      height: '175px',
-      flexShrink: 0
-    }}>
-      {/* 1. INSAT-3D IR (Real MOSDAC Observation Raster) */}
-      <PanelCard
-        title="INSAT-3D IR (°C)"
-        badge={badge}
-        rightLabel={insatRightLabel}
-        footer={<><span>MOSDAC TIR-1 (10.8 µm)</span><span>Real H5 [170K, 330K]</span></>}
-      >
-        <InsatPanel dwrFrameData={dwrFrameData} stormState={stormState} />
-      </PanelCard>
+    <>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '8px',
+        padding: '7px 16px',
+        background: '#F5F7FA',
+        borderTop: '1px solid #E2E8F0',
+        borderBottom: '1px solid #E2E8F0',
+        height: '190px',
+        flexShrink: 0
+      }}>
+        {/* 1. INSAT-3D IR (Real MOSDAC Observation Raster) */}
+        <PanelCard
+          title="INSAT-3D IR (°C)"
+          badge={cardsMeta.insat.badge}
+          badgeColor={cardsMeta.insat.badgeColor}
+          rightLabel={insatRightLabel}
+          onExpand={() => setExpandedCard('insat')}
+          footer={cardsMeta.insat.footer}
+        >
+          <InsatPanel dwrFrameData={dwrFrameData} stormState={stormState} />
+        </PanelCard>
 
-      {/* 2. DWR Reflectivity (Real TERLS Radar Replay) */}
-      <PanelCard
-        title="DWR Reflectivity (dBZ)"
-        badge={badge}
-        rightLabel={tsFormatted}
-        footer={<><span>TERLS C-Band (250 km)</span><span>ConvGRU · 30,369 params</span></>}
-      >
-        <DwrPanel dwrFrameData={dwrFrameData} stormState={stormState} />
-      </PanelCard>
+        {/* 2. DWR Reflectivity (Real TERLS Radar Replay) */}
+        <PanelCard
+          title="DWR Reflectivity (dBZ)"
+          badge={badge}
+          rightLabel={tsFormatted}
+          onExpand={() => setExpandedCard('dwr')}
+          footer={<><span>TERLS C-Band (250 km)</span><span>ConvGRU · 30,369 params</span></>}
+        >
+          <DwrPanel dwrFrameData={dwrFrameData} stormState={stormState} isExpanded={false} />
+        </PanelCard>
 
-      {/* 3. Vertical Cross-section (Real DWR Volumetric RHI Slice) */}
-      <PanelCard
-        title="Vertical Cross-section (DWR)"
-        rightLabel={topHeightLabel}
-        footer={<><span>Height (km) vs Distance (km)</span><span>Volumetric Scan Extent</span></>}
-      >
-        <CrossSection selectedStorm={effectiveStorm} dwrFrameData={dwrFrameData} />
-      </PanelCard>
+        {/* 3. Vertical Cross-section (Real DWR Volumetric RHI Slice) */}
+        <PanelCard
+          title="Vertical Cross-section (DWR)"
+          rightLabel={topHeightLabel}
+          onExpand={() => setExpandedCard('cross_section')}
+          footer={<><span>Height (km) vs Distance (km)</span><span>Volumetric Scan Extent</span></>}
+        >
+          <CrossSection selectedStorm={effectiveStorm} dwrFrameData={dwrFrameData} />
+        </PanelCard>
 
-      {/* 4. Motion Vectors (Real Farneback Optical Flow) */}
-      <PanelCard
-        title="Motion Vectors (Optical Flow)"
-        rightLabel="Speed (km/h)"
-        footer={<><span>Centroid · {motionLabel}</span><span>Farneback Optical Flow</span></>}
-      >
-        <MotionPanel dwrFrameData={dwrFrameData} stormState={stormState} />
-      </PanelCard>
-    </div>
+        {/* 4. Motion Vectors (Real Farneback Optical Flow) */}
+        <PanelCard
+          title="Motion Vectors (Optical Flow)"
+          rightLabel="Speed (km/h)"
+          onExpand={() => setExpandedCard('motion')}
+          footer={<><span>Centroid · {motionLabel}</span><span>Farneback Optical Flow</span></>}
+        >
+          <MotionPanel dwrFrameData={dwrFrameData} stormState={stormState} />
+        </PanelCard>
+      </div>
+
+      {/* Expanded Focused Viewer Modal */}
+      {activeExpanded && (
+        <div
+          onClick={() => setExpandedCard(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.78)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '12px',
+              width: 'min(92vw, 1060px)',
+              height: 'min(82vh, 680px)',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)',
+              border: '1px solid #CBD5E1',
+              overflow: 'hidden',
+              animation: 'fadeIn 0.15s ease-out'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 20px',
+              background: '#F8FAFC',
+              borderBottom: '1px solid #E2E8F0'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
+                  {activeExpanded.title}
+                </span>
+                {activeExpanded.badge && (
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    background: activeExpanded.badgeColor?.bg || '#DBEAFE',
+                    color: activeExpanded.badgeColor?.text || '#1E40AF',
+                    border: `1px solid ${activeExpanded.badgeColor?.border || '#93C5FD'}`
+                  }}>
+                    {activeExpanded.badge}
+                  </span>
+                )}
+                {activeExpanded.rightLabel && (
+                  <span style={{ fontSize: '11px', color: '#64748B', fontFamily: 'monospace' }}>
+                    {activeExpanded.rightLabel}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => setExpandedCard(null)}
+                title="Close expanded viewer (Esc)"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: '#FFFFFF',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '6px',
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  color: '#334155',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                }}
+              >
+                <X size={15} />
+                <span>Close</span>
+              </button>
+            </div>
+
+            {/* Modal Content - Exact same visualization, now enlarged */}
+            <div style={{ flex: 1, minHeight: 0, position: 'relative', background: '#0D1624' }}>
+              {activeExpanded.component}
+            </div>
+
+            {/* Modal Footer */}
+            {activeExpanded.footer && (
+              <div style={{
+                padding: '10px 20px',
+                background: '#F8FAFC',
+                borderTop: '1px solid #E2E8F0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '11.5px',
+                color: '#64748B'
+              }}>
+                {activeExpanded.footer}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -51,3 +51,6 @@ desktop.ini
 
 # Kaggle cache
 .cache/
+scratch/
+carto_*.png
+esri_*.png

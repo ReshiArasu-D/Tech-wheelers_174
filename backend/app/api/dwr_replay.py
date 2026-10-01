@@ -4,7 +4,7 @@ Provides the pre-computed TERLS DWR replay sequence frames for the frontend.
 All data originates from real terls_20191107_X.npy passed through the Indian
 DWR ConvGRU checkpoint — no mock data.
 """
-import os, json, base64
+import os, json, base64, datetime
 from fastapi import APIRouter, HTTPException
 from typing import Optional
 import numpy as np
@@ -14,6 +14,7 @@ from backend.app.services.satellite import satellite_service
 from backend.app.services.hazards import hazard_service
 from backend.app.services.risk import risk_engine
 from backend.app.services.arrival import arrival_engine
+from backend.app.services.geocoding import reverse_geocode_osm
 
 router = APIRouter(tags=["DWR Replay"])
 
@@ -85,6 +86,32 @@ def _dbz_to_geojson_features(dbz_2d: np.ndarray, lat_min: float, lat_max: float,
     return features
 
 
+_cached_thumbnails = None
+
+def _generate_dwr_thumbnails():
+    """Generates authentic DWR radar reflectivity mini-thumbnails for all 15 sequences."""
+    global _cached_thumbnails
+    if _cached_thumbnails is not None:
+        return _cached_thumbnails
+    thumbnails = []
+    if os.path.isfile(X_PATH):
+        try:
+            X = np.load(X_PATH, mmap_mode="r")
+            for i in range(min(15, len(X))):
+                dbz = np.clip(np.array(X[i, -1, 0]) * 70.0, 0, 70)
+                norm = np.clip(dbz / 45.0 * 255.0, 0, 255).astype(np.uint8)
+                color = cv2.applyColorMap(norm, cv2.COLORMAP_TURBO)
+                color[dbz < 5] = [25, 18, 12]  # dark background for low/no echo
+                thumb = cv2.resize(color, (46, 22), interpolation=cv2.INTER_AREA)
+                _, buf = cv2.imencode('.png', thumb)
+                b64 = 'data:image/png;base64,' + base64.b64encode(buf).decode('ascii')
+                thumbnails.append(b64)
+            _cached_thumbnails = thumbnails
+        except Exception as e:
+            print(f"[dwr_replay] Thumbnail generation error: {e}")
+    return thumbnails or []
+
+
 @router.get("/dwr/replay/info")
 def dwr_replay_info():
     """Returns metadata about the available DWR historical replay."""
@@ -103,6 +130,7 @@ def dwr_replay_info():
         "first_timestamp":   data["first_ts"],
         "last_timestamp":    data["last_ts"],
         "timestamps":        data["timestamps"],
+        "thumbnails":        _generate_dwr_thumbnails(),
         "mode":              "HISTORICAL_REPLAY",
         "mock_data":         False,
         "radar_location":    {"lat": TERLS_LAT, "lon": TERLS_LON},
@@ -165,7 +193,7 @@ def dwr_replay_frame(seq_idx: int):
         }
 
         # ── Real Storm Object Extraction from TERLS DWR Reflectivity ───────
-        sat_frame = satellite_service.read_frame(seq["timestamp"])
+        sat_frame = satellite_service.read_frame(seq["timestamp"], target_location=(TERLS_LAT, TERLS_LON))
         sat_frame["seq_idx"] = seq_idx
         sat_frame["frame_index"] = seq_idx
 
@@ -275,8 +303,10 @@ def dwr_replay_frame(seq_idx: int):
 
             corridor_poly = corr_left + corr_right + [corr_left[0]]
 
+            loc_name = reverse_geocode_osm(lat, lon)
             storm_obj = {
                 "storm_id": storm_id,
+                "location_name": loc_name,
                 "timestamp": seq["timestamp"],
                 "centroid": {"lat": round(lat, 4), "lon": round(lon, 4)},
                 "max_dbz": round(max_d, 1),
@@ -285,7 +315,9 @@ def dwr_replay_frame(seq_idx: int):
                 "area_km2": area_km2,
                 "intensity": round(max_d / 70.0, 3),
                 "severity": "SEVERE" if max_d >= 40.0 else ("HIGH" if max_d >= 30.0 else "MODERATE"),
-                "min_tb_k": float(sat_frame.get("stats", {}).get("min_tb_k", 195.0)),
+                "min_tb_k": float(sat_frame.get("stats", {}).get("min_tb_k", 195.0)) if (sat_frame.get("bounds", {}).get("min_lat", 99) <= lat <= sat_frame.get("bounds", {}).get("max_lat", -99) and sat_frame.get("bounds", {}).get("min_lon", 999) <= lon <= sat_frame.get("bounds", {}).get("max_lon", -999)) else None,
+                "insat_overlap": (sat_frame.get("bounds", {}).get("min_lat", 99) <= lat <= sat_frame.get("bounds", {}).get("max_lat", -99) and sat_frame.get("bounds", {}).get("min_lon", 999) <= lon <= sat_frame.get("bounds", {}).get("max_lon", -999)),
+                "insat_status": "SPATIALLY ALIGNED" if (sat_frame.get("bounds", {}).get("min_lat", 99) <= lat <= sat_frame.get("bounds", {}).get("max_lat", -99) and sat_frame.get("bounds", {}).get("min_lon", 999) <= lon <= sat_frame.get("bounds", {}).get("max_lon", -999)) else "NO SPATIAL OVERLAP",
                 "motion": {
                     "speed_kmh": round(speed_kmh, 1),
                     "direction_deg": round(dir_deg, 1),
@@ -331,8 +363,10 @@ def dwr_replay_frame(seq_idx: int):
                 corr_left.append([round(c_ln + norm_lon, 4), round(c_lt + norm_lat, 4)])
                 corr_right.insert(0, [round(c_ln - norm_lon, 4), round(c_lt - norm_lat, 4)])
 
+            loc_name = reverse_geocode_osm(init_lat, init_lon)
             storms.append({
                 "storm_id": "TERLS-STORM-001",
+                "location_name": loc_name,
                 "timestamp": seq["timestamp"],
                 "centroid": {"lat": init_lat, "lon": init_lon},
                 "max_dbz": round(max_d, 1),
@@ -340,7 +374,9 @@ def dwr_replay_frame(seq_idx: int):
                 "top_height_km": 10.5,
                 "area_km2": 95.0,
                 "severity": "MODERATE",
-                "min_tb_k": float(sat_frame.get("stats", {}).get("min_tb_k", 195.0)),
+                "min_tb_k": float(sat_frame.get("stats", {}).get("min_tb_k", 195.0)) if (sat_frame.get("bounds", {}).get("min_lat", 99) <= init_lat <= sat_frame.get("bounds", {}).get("max_lat", -99) and sat_frame.get("bounds", {}).get("min_lon", 999) <= init_lon <= sat_frame.get("bounds", {}).get("max_lon", -999)) else None,
+                "insat_overlap": (sat_frame.get("bounds", {}).get("min_lat", 99) <= init_lat <= sat_frame.get("bounds", {}).get("max_lat", -99) and sat_frame.get("bounds", {}).get("min_lon", 999) <= init_lon <= sat_frame.get("bounds", {}).get("max_lon", -999)),
+                "insat_status": "SPATIALLY ALIGNED" if (sat_frame.get("bounds", {}).get("min_lat", 99) <= init_lat <= sat_frame.get("bounds", {}).get("max_lat", -99) and sat_frame.get("bounds", {}).get("min_lon", 999) <= init_lon <= sat_frame.get("bounds", {}).get("max_lon", -999)) else "NO SPATIAL OVERLAP",
                 "motion": {"speed_kmh": 32.0, "direction_deg": 45.0, "bearing_cardinal": "NE"},
                 "polygon_geojson": {
                     "type": "Polygon",
@@ -406,23 +442,107 @@ def dwr_replay_frame(seq_idx: int):
             "rhi_image_data_uri": rhi_image_uri
         }
 
-        # ── 4. Nearest Real INSAT Observation for this 10-min Replay Frame ────
+        # ── 4. Geolocation Audit & Spatial Overlap Calculation ─────────────────
+        primary_storm = storms[0] if storms else None
+        p_lat = primary_storm["centroid"]["lat"] if primary_storm else TERLS_LAT
+        p_lon = primary_storm["centroid"]["lon"] if primary_storm else TERLS_LON
+        sat_bounds = sat_frame.get("bounds", {
+            "min_lat": 10.1009, "max_lat": 23.9746,
+            "min_lon": 80.0271, "max_lon": 93.9008
+        })
+
+        has_spatial_overlap = (sat_bounds["min_lat"] <= p_lat <= sat_bounds["max_lat"]) and (sat_bounds["min_lon"] <= p_lon <= sat_bounds["max_lon"])
+
+        # Accurate physical separation to satellite bounding box
+        d_lat_deg = max(0.0, sat_bounds["min_lat"] - p_lat, p_lat - sat_bounds["max_lat"])
+        d_lon_deg = max(0.0, sat_bounds["min_lon"] - p_lon, p_lon - sat_bounds["max_lon"])
+        dist_km = round(float(np.hypot(d_lat_deg * 111.0, d_lon_deg * 111.0 * np.cos(np.radians(p_lat)))), 1)
+
+        spatial_rel = {
+            "has_spatial_overlap": has_spatial_overlap,
+            "selected_storm_id": primary_storm["storm_id"] if primary_storm else "UNAVAILABLE",
+            "storm_centroid": {"lat": p_lat, "lon": p_lon},
+            "dwr_extent": {
+                "lat_min": LAT_MIN, "lat_max": LAT_MAX,
+                "lon_min": LON_MIN, "lon_max": LON_MAX
+            },
+            "insat_extent": sat_bounds,
+            "distance_to_boundary_km": dist_km,
+            "insat_acquisition_timestamp": sat_frame.get("obs_timestamp", sat_frame.get("timestamp")),
+            "dwr_timestamp": seq["timestamp"],
+            "status_label": "SPATIALLY ALIGNED" if has_spatial_overlap else "NO SPATIAL OVERLAP",
+            "explanation": (
+                f"Selected storm ({p_lat:.2f}°N, {p_lon:.2f}°E) is within verified MOSDAC INSAT-3DR footprint ({sat_bounds['min_lat']:.2f}°–{sat_bounds['max_lat']:.2f}°N, {sat_bounds['min_lon']:.2f}°–{sat_bounds['max_lon']:.2f}°E)."
+                if has_spatial_overlap else
+                f"Selected TERLS storm ({p_lat:.2f}°N, {p_lon:.2f}°E) is in Kerala, while this MOSDAC INSAT-3D Level-1B product covers the Bay of Bengal ({sat_bounds['min_lat']:.2f}°–{sat_bounds['max_lat']:.2f}°N, {sat_bounds['min_lon']:.2f}°–{sat_bounds['max_lon']:.2f}°E). Distance to product boundary: ~{dist_km} km."
+            ),
+            "fusion_eligible": has_spatial_overlap
+        }
+
+        # Calculate brightness temperature at storm centroid if spatially overlapping
+        storm_centroid_tb_k = None
+        if has_spatial_overlap and "lat_grid" in sat_frame and "lon_grid" in sat_frame and "tb_kelvin" in sat_frame:
+            try:
+                lat_arr = sat_frame["lat_grid"]
+                lon_arr = sat_frame["lon_grid"]
+                tb_arr = sat_frame["tb_kelvin"]
+                dist_sq = (lat_arr - p_lat)**2 + (lon_arr - p_lon)**2
+                min_idx = np.unravel_index(np.argmin(dist_sq), dist_sq.shape)
+                storm_centroid_tb_k = round(float(tb_arr[min_idx]), 1)
+            except Exception:
+                storm_centroid_tb_k = round(float(sat_frame.get("stats", {}).get("min_tb_k", 298.3)), 1)
+
+        dwr_ts = seq["timestamp"]
+        dwr_dt = datetime.datetime.fromisoformat(dwr_ts.replace("Z", "+00:00"))
+        insat_obs_ts = sat_frame.get("obs_timestamp", sat_frame.get("timestamp", dwr_ts))
+        try:
+            insat_dt = datetime.datetime.fromisoformat(insat_obs_ts.replace("Z", "+00:00"))
+            time_diff_min = round(abs((dwr_dt - insat_dt).total_seconds()) / 60.0, 1)
+        except Exception:
+            time_diff_min = 0.0
+
+        TEMPORAL_TOLERANCE_MIN = 30.0
+        has_temporal_overlap = (time_diff_min <= TEMPORAL_TOLERANCE_MIN)
+        full_fusion_valid = has_spatial_overlap and has_temporal_overlap
+
+        sat_meta = sat_frame.get("metadata", {})
+        insat_filename = sat_frame.get("filename", "3RIMG_07NOV2019_0302_L1C_SGP_V01R00.h5")
+
         insat_info = {
-            "obs_timestamp": sat_frame.get("obs_timestamp", sat_frame.get("timestamp")),
-            "min_tb_k": sat_frame.get("stats", {}).get("min_tb_k"),
+            "filename": insat_filename,
+            "dwr_timestamp": dwr_ts,
+            "obs_timestamp": insat_obs_ts,
+            "time_difference_minutes": time_diff_min,
+            "temporal_tolerance_minutes": TEMPORAL_TOLERANCE_MIN,
+            "temporal_compatibility": "VALID" if has_temporal_overlap else f"OUT_OF_TOLERANCE (+{time_diff_min}m > 30m)",
+            "min_tb_k": sat_frame.get("stats", {}).get("min_tb_k") if has_spatial_overlap else None,
+            "storm_centroid_tb_k": storm_centroid_tb_k,
+            "regional_product_min_tb_k": sat_frame.get("stats", {}).get("min_tb_k"),
             "max_tb_k": sat_frame.get("stats", {}).get("max_tb_k"),
             "mean_tb_k": sat_frame.get("stats", {}).get("mean_tb_k"),
             "convective_pixel_fraction": sat_frame.get("stats", {}).get("convective_pixel_fraction"),
-            "satellite": sat_frame.get("metadata", {}).get("satellite", "INSAT-3D"),
-            "source": sat_frame.get("metadata", {}).get("source", "ISRO MOSDAC"),
+            "satellite": sat_meta.get("satellite", "INSAT-3DR" if "3RIMG" in insat_filename else "INSAT-3D"),
+            "source": sat_meta.get("source", "ISRO MOSDAC Level-1C SGP"),
+            "bounds": sat_bounds,
+            "spatial_overlap": has_spatial_overlap,
+            "temporal_overlap": has_temporal_overlap,
+            "overlap_status": "SPATIALLY ALIGNED" if has_spatial_overlap else "NO SPATIAL OVERLAP",
+            "spatial_relationship": spatial_rel,
             "image_data_uri": sat_frame.get("image_data_uri", "")
         }
 
         # ── 5. Real Multi-Hazard Evaluation for this Frame's Storms ───────────
+        # When spatial or temporal overlap is absent, INSAT is marked unavailable for local fusion
+        sensor_availability = {
+            "insat": "available" if full_fusion_valid else ("unavailable_temporal_mismatch" if not has_temporal_overlap else "unavailable_spatial_mismatch"),
+            "era5": "available",
+            "dwr": "available",
+            "lightning": "available"
+        }
         era5_ctx = satellite_service.get_era5_context(seq["timestamp"])
         hazards = hazard_service.evaluate_hazards(
             sat_frame, storms, era5_ctx,
-            {"insat": "available", "era5": "available", "dwr": "available", "lightning": "available"},
+            sensor_availability,
             horizon_min=30
         )
         # Ensure each hazard has a polygon_geojson for map display
@@ -437,9 +557,31 @@ def dwr_replay_frame(seq_idx: int):
                         }
 
         # ── 6. Real Risk & Arrival Calculations ───────────────────────────────
-        sensors = {"insat": "available", "era5": "available", "dwr": "available", "lightning": "available"}
-        arrival_data = arrival_engine.compute_arrivals(storms, {}, sensors)
-        risk_data = risk_engine.compute_risk(hazards, storms, arrival_data, sensors)
+        arrival_data = arrival_engine.compute_arrivals(storms, {}, sensor_availability)
+        risk_data = risk_engine.compute_risk(hazards, storms, arrival_data, sensor_availability)
+
+        if full_fusion_valid:
+            fusion_mode = "FULL DWR + INSAT + ERA5 MULTIMODAL FUSION"
+            eligibility_str = "ELIGIBLE"
+            weights_dict = {"dwr": 0.65, "insat": 0.25, "era5": 0.10}
+        elif not has_spatial_overlap:
+            fusion_mode = "RADAR-ANCHORED DWR + ERA5 (INSAT OUT OF DOMAIN)"
+            eligibility_str = "INSAT excluded from local convective core fusion due to non-overlapping product extent"
+            weights_dict = {"dwr": 0.85, "insat": 0.0, "era5": 0.15}
+        else:
+            fusion_mode = "RADAR-ANCHORED DWR + ERA5 (INSAT TEMPORAL MISMATCH)"
+            eligibility_str = f"INSAT excluded from local convective core fusion: observation {insat_obs_ts} is {time_diff_min} min from DWR {dwr_ts} (exceeds 30m limit)"
+            weights_dict = {"dwr": 0.85, "insat": 0.0, "era5": 0.15}
+
+        # Diagnostic logging for replay frame tracking
+        print(
+            f"[DWR REPLAY DIAGNOSTIC] DWR: {dwr_ts} "
+            f"-> Selected INSAT: {insat_filename} "
+            f"-> Obs: {insat_obs_ts} "
+            f"-> Delta_t: {time_diff_min}m "
+            f"-> Temporal: {'VALID' if has_temporal_overlap else 'OUT_OF_TOLERANCE'} "
+            f"-> Fusion Mode: {fusion_mode}"
+        )
 
         return {
             "seq_idx":         seq_idx,
@@ -465,6 +607,16 @@ def dwr_replay_frame(seq_idx: int):
                 "lat_min": LAT_MIN, "lat_max": LAT_MAX,
                 "lon_min": LON_MIN, "lon_max": LON_MAX
             },
+            "fusion_status": {
+                "mode": fusion_mode,
+                "dwr_insat_spatial_overlap": has_spatial_overlap,
+                "dwr_insat_temporal_overlap": has_temporal_overlap,
+                "eligibility": eligibility_str,
+                "timestamp_compatibility": f"MATCHED ({insat_obs_ts}, Δt: {time_diff_min}m)" if has_temporal_overlap else f"TEMPORAL MISMATCH (Δt: {time_diff_min}m > 30m)",
+                "geographic_relationship": "SPATIALLY ALIGNED (Footprint covers TERLS Kerala storm 8.85°N, 76.82°E)" if has_spatial_overlap else "NO SPATIAL OVERLAP (TERLS SW Coast vs MOSDAC Bay of Bengal)",
+                "era5_available": True,
+                "weights": weights_dict
+            },
             "data_status": {
                 "real_data":      True,
                 "checkpoint":     os.path.basename(data["checkpoint"]),
@@ -473,4 +625,18 @@ def dwr_replay_frame(seq_idx: int):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")
+
+
+@router.get("/geocode")
+def geocode_location(lat: float, lon: float):
+    """
+    Dynamically resolves area/place name from coordinates via OpenStreetMap Nominatim.
+    Returns 'UNAVAILABLE' if unresolvable.
+    """
+    name = reverse_geocode_osm(lat, lon)
+    return {
+        "lat": lat,
+        "lon": lon,
+        "area_name": name or "UNAVAILABLE"
+    }
 

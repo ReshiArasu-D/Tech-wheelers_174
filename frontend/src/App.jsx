@@ -55,7 +55,7 @@ export default function App() {
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [isChatDrawerOpen, setIsChatDrawerOpen] = useState(false);
-  const [isLandingOpen, setIsLandingOpen] = useState(false);
+  const [isLandingOpen, setIsLandingOpen] = useState(true);
 
 
   // Real DWR Historical Replay State (03:00 to 05:20 UTC)
@@ -76,7 +76,7 @@ export default function App() {
 
   // ── 1. WebSocket Live Stream ───────────────────────────────────────────────
   useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL || (import.meta.env.PROD ? 'wss://now-casr.onrender.com/ws/live' : 'ws://localhost:8000/ws/live');
+    const wsUrl = import.meta.env.VITE_WS_URL || (import.meta.env.PROD ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/live` : 'ws://localhost:8000/ws/live');
     let socket;
     try {
       socket = new WebSocket(wsUrl);
@@ -391,6 +391,7 @@ export default function App() {
       <TimelineControl
         timestamps={timestamps}
         currentTimestamp={currentTimestamp}
+        thumbnails={dwrReplayInfo?.thumbnails}
         onSelectTimestamp={(ts) => {
           setCurrentTimestamp(ts);
         }}

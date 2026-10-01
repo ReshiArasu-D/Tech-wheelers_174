@@ -10,6 +10,7 @@ import {
 export default function TimelineControl({
   timestamps = [],
   currentTimestamp,
+  thumbnails = [],
   onSelectTimestamp,
   isLive = false,
   onToggleLive,
@@ -309,11 +310,35 @@ export default function TimelineControl({
                 width: '46px',
                 height: '22px',
                 borderRadius: '3px',
-                background: isSelected
-                  ? 'radial-gradient(circle at center, #DC2626 0%, #EA580C 35%, #2563EB 85%)'
-                  : 'radial-gradient(circle at center, #0284C7 0%, #0F172A 100%)',
-                border: '1px solid rgba(0,0,0,0.08)'
-              }} />
+                overflow: 'hidden',
+                backgroundColor: '#0F172A',
+                border: isSelected ? '1.5px solid #2563EB' : '1px solid rgba(0,0,0,0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: isSelected ? '0 0 0 2px rgba(37,99,235,0.2)' : 'none'
+              }}>
+                {thumbnails && thumbnails[idx] ? (
+                  <img
+                    src={thumbnails[idx]}
+                    alt={`radar-${idx}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block'
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    background: isSelected
+                      ? 'radial-gradient(circle at center, #DC2626 0%, #EA580C 35%, #2563EB 85%)'
+                      : 'radial-gradient(circle at center, #0284C7 0%, #0F172A 100%)'
+                  }} />
+                )}
+              </div>
               <span style={{
                 fontSize: '8.5px',
                 fontFamily: 'monospace',

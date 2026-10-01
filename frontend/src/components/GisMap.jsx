@@ -6,47 +6,9 @@ import { api } from '../services/api';
 const TERLS_LAT = 8.5241;
 const TERLS_LON = 76.9366;
 
-// High-resolution Satellite Hybrid style (ESRI photorealistic satellite + Carto labels)
-// Works globally on localhost, Render, and custom domains with ZERO 403 blocks or key restrictions
-const SATELLITE_HYBRID_STYLE = {
-  version: 8,
-  sources: {
-    'esri-satellite': {
-      type: 'raster',
-      tiles: [
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-      ],
-      tileSize: 256,
-      attribution: 'Esri, Maxar, Earthstar Geographics'
-    },
-    'carto-labels': {
-      type: 'raster',
-      tiles: [
-        'https://basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png'
-      ],
-      tileSize: 256
-    }
-  },
-  layers: [
-    {
-      id: 'esri-satellite-layer',
-      type: 'raster',
-      source: 'esri-satellite',
-      minzoom: 0,
-      maxzoom: 19
-    },
-    {
-      id: 'carto-labels-layer',
-      type: 'raster',
-      source: 'carto-labels',
-      minzoom: 0,
-      maxzoom: 19,
-      paint: {
-        'raster-opacity': 0.85
-      }
-    }
-  ]
-};
+// MapTiler Satellite Hybrid — uses VITE_MAPTILER_API_KEY from .env
+const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_API_KEY || 'ehLkmAaIGPEMafg5WhXy';
+const SATELLITE_HYBRID_STYLE = `https://api.maptiler.com/maps/hybrid/style.json?key=${MAPTILER_KEY}`;
 
 export default function GisMap({
   storms = [],
@@ -596,12 +558,12 @@ export default function GisMap({
     }
   }, [mapLoaded, storms, dwrFrameData, selectedStorm]);
 
-  // ── 7a. Dynamic Map Information Boxes for Real Storm Objects ─────────────────
+  // ── 7a. Dynamic Area / Place Name Labels Directly Beside Every Map Dot ──────
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return;
     const map = mapRef.current;
 
-    // Clear previous info box markers
+    // Clear previous dot area labels
     stormInfoMarkersRef.current.forEach(m => m.remove());
     stormInfoMarkersRef.current = [];
 
@@ -610,9 +572,6 @@ export default function GisMap({
     const stormList = (dwrFrameData?.storms && dwrFrameData.storms.length > 0)
       ? dwrFrameData.storms
       : storms;
-
-    const activeHazards = dwrFrameData?.hazards || stormState?.hazards || hazards || {};
-    const activeArrival = dwrFrameData?.arrival || stormState?.arrival || arrival || {};
 
     stormList.forEach(s => {
       const lat = s.centroid?.lat;
@@ -624,138 +583,114 @@ export default function GisMap({
 
       const isSelected = selectedStorm && (selectedStorm.storm_id === stormId || selectedStorm.id === stormId);
 
-      // 1. Resolved geographic location name (omit if not present)
-      const locationName = s.location_name || s.location || s.city || s.region || s.target_name || s.name;
+      // Determine dot indicator color based on severity
+      const maxD = s.max_dbz ?? 30;
+      const dotColor = isSelected ? '#38bdf8' : (maxD >= 40 ? '#ef4444' : maxD >= 30 ? '#f97316' : '#0284c7');
 
-      // 2. Currently selected hazard & hazard probability (omit if not present)
-      const hazardEntry = selectedHazard ? activeHazards[selectedHazard] : null;
-      const hazardLabel = hazardEntry?.name || hazardEntry?.hazard_type || selectedHazard;
-      const rawProb = hazardEntry ? (hazardEntry.calibrated_probability ?? hazardEntry.probability) : null;
-      const probFormatted = (rawProb != null && !isNaN(rawProb)) ? `${Math.round(rawProb * 100)}%` : null;
-
-      // 3. Existing movement information (omit if not present)
-      const motion = s.motion;
-      let motionText = null;
-      if (motion && typeof motion === 'object') {
-        const speed = motion.speed_kmh != null ? `${motion.speed_kmh} km/h` : null;
-        const dir = motion.bearing_cardinal || (motion.direction_deg != null ? `${motion.direction_deg}°` : null);
-        const parts = [speed, dir].filter(Boolean);
-        if (parts.length > 0) motionText = parts.join(' ');
-      }
-
-      // 4. Existing arrival information (omit if not present)
-      let arrivalText = null;
-      if (s.arrival) {
-        if (typeof s.arrival === 'string' && s.arrival.trim() !== '') {
-          arrivalText = s.arrival;
-        } else if (s.arrival?.countdown_display && s.arrival.countdown_display !== 'NO IMPACT DETECTED') {
-          arrivalText = s.arrival.countdown_display;
-        } else if (s.arrival?.estimated_arrival_minutes != null) {
-          arrivalText = `ETA ${s.arrival.estimated_arrival_minutes}m`;
-        }
-      } else if (activeArrival) {
-        const arrivalList = Array.isArray(activeArrival) ? activeArrival : Object.values(activeArrival);
-        const matchedTarget = arrivalList.find(tgt =>
-          (tgt?.storm_id === stormId || tgt?.intersecting_storm_id === stormId) &&
-          tgt?.countdown_display && tgt.countdown_display !== 'NO IMPACT DETECTED'
-        );
-        if (matchedTarget) {
-          const targetLabel = matchedTarget.target_name ? `${matchedTarget.target_name}: ` : '';
-          arrivalText = `${targetLabel}${matchedTarget.countdown_display}`;
-        }
-      }
-
-      // 5. Existing dBZ / severity (omit if not present)
-      const dbzText = s.max_dbz != null ? `${s.max_dbz} dBZ` : null;
-      const severity = s.severity || null;
-
-      // Create DOM element for floating info box
-      const box = document.createElement('div');
-      box.className = 'storm-map-infobox';
-      box.style.cssText = `
-        background: rgba(10, 15, 29, 0.92);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        border: ${isSelected ? '1.5px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.18)'};
-        border-radius: 6px;
-        padding: 5px 8px;
-        color: #ffffff;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 11px;
-        line-height: 1.35;
-        box-shadow: ${isSelected ? '0 0 12px rgba(56, 189, 248, 0.45), 0 4px 12px rgba(0, 0, 0, 0.7)' : '0 2px 8px rgba(0, 0, 0, 0.55)'};
+      // Create DOM element for the dynamic area label: ● [Area Name]
+      const label = document.createElement('div');
+      label.className = `map-dot-area-label ${isSelected ? 'selected' : ''}`;
+      label.setAttribute('data-storm-id', stormId);
+      label.title = `${stormId} — Click to inspect`;
+      label.style.cssText = `
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(10, 15, 29, 0.85);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        border: ${isSelected ? '1.5px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.2)'};
+        border-radius: 4px;
+        padding: 3px 8px;
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 11.5px;
+        font-weight: 600;
+        line-height: 1.2;
+        box-shadow: ${isSelected ? '0 0 12px rgba(56, 189, 248, 0.5), 0 2px 6px rgba(0, 0, 0, 0.7)' : '0 2px 5px rgba(0, 0, 0, 0.6)'};
         cursor: pointer;
         pointer-events: auto;
         user-select: none;
         white-space: nowrap;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease;
-        z-index: ${isSelected ? 50 : 10};
+        transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+        z-index: ${isSelected ? 50 : 15};
       `;
 
-      box.onmouseenter = () => {
-        box.style.borderColor = '#38bdf8';
-        box.style.boxShadow = '0 0 12px rgba(56, 189, 248, 0.5), 0 4px 14px rgba(0, 0, 0, 0.7)';
-        box.style.zIndex = '999';
+      label.onmouseenter = () => {
+        label.style.borderColor = '#38bdf8';
+        label.style.transform = 'translateY(-1px) scale(1.04)';
+        label.style.boxShadow = '0 0 10px rgba(56, 189, 248, 0.55), 0 4px 10px rgba(0, 0, 0, 0.7)';
       };
-      box.onmouseleave = () => {
-        box.style.borderColor = isSelected ? '#38bdf8' : 'rgba(255, 255, 255, 0.18)';
-        box.style.boxShadow = isSelected ? '0 0 12px rgba(56, 189, 248, 0.45), 0 4px 12px rgba(0, 0, 0, 0.7)' : '0 2px 8px rgba(0, 0, 0, 0.55)';
-        box.style.zIndex = isSelected ? '50' : '10';
+      label.onmouseleave = () => {
+        label.style.borderColor = isSelected ? '#38bdf8' : 'rgba(255, 255, 255, 0.2)';
+        label.style.transform = 'translateY(0) scale(1)';
+        label.style.boxShadow = isSelected ? '0 0 12px rgba(56, 189, 248, 0.5), 0 2px 6px rgba(0, 0, 0, 0.7)' : '0 2px 5px rgba(0, 0, 0, 0.6)';
       };
 
-      box.onclick = (e) => {
+      // Clicking or touching label selects the storm
+      label.onclick = (e) => {
+        e.stopPropagation();
+        onSelectStorm?.(s);
+      };
+      label.ontouchend = (e) => {
         e.stopPropagation();
         onSelectStorm?.(s);
       };
 
-      // Construct compact inner content ONLY from real existing fields
-      let headerHtml = `<div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; font-weight: 700;">`;
-      headerHtml += `<span style="color: ${isSelected ? '#38bdf8' : '#f8fafc'};">${stormId}</span>`;
-      if (severity || dbzText) {
-        const badgeParts = [severity, dbzText].filter(Boolean).join(' · ');
-        const sevColor = severity === 'SEVERE' ? '#ef4444' : severity === 'HIGH' ? '#f97316' : '#38bdf8';
-        headerHtml += `<span style="font-size: 9px; padding: 1px 4px; border-radius: 3px; background: rgba(255,255,255,0.08); color: ${sevColor}; font-weight: 600;">${badgeParts}</span>`;
-      }
-      headerHtml += `</div>`;
+      // Colored dot glyph
+      const dotEl = document.createElement('span');
+      dotEl.style.cssText = `
+        color: ${dotColor};
+        font-size: 12px;
+        line-height: 1;
+        text-shadow: 0 0 6px ${dotColor};
+      `;
+      dotEl.textContent = '●';
 
-      let locationHtml = '';
-      if (locationName && typeof locationName === 'string' && locationName.trim()) {
-        locationHtml = `<div style="color: #94a3b8; font-size: 10px; margin-top: 2px;">📍 ${locationName}</div>`;
+      // Dynamically resolved area name text
+      const nameEl = document.createElement('span');
+      nameEl.style.cssText = `
+        color: ${isSelected ? '#38bdf8' : '#f8fafc'};
+        letter-spacing: 0.2px;
+      `;
+
+      const initialName = s.location_name || s.location || null;
+      if (initialName && initialName.trim() !== '') {
+        nameEl.textContent = initialName;
+      } else {
+        nameEl.textContent = '...';
+        // Asynchronously resolve area name dynamically from real backend OSM reverse geocoder
+        api.geocode(lat, lon)
+          .then(res => {
+            nameEl.textContent = (res?.area_name && res.area_name.trim() !== '') ? res.area_name : 'UNAVAILABLE';
+          })
+          .catch(() => {
+            nameEl.textContent = 'UNAVAILABLE';
+          });
       }
 
-      let hazardHtml = '';
-      if (selectedHazard && hazardEntry && probFormatted) {
-        hazardHtml = `<div style="color: #facc15; font-size: 10px; font-weight: 600; margin-top: 2px;">⚡ ${hazardLabel}: ${probFormatted}</div>`;
-      }
-
-      let motionHtml = '';
-      if (motionText) {
-        motionHtml = `<div style="color: #cbd5e1; font-size: 10px; margin-top: 2px;">↗ ${motionText}</div>`;
-      }
-
-      let arrivalHtml = '';
-      if (arrivalText) {
-        arrivalHtml = `<div style="color: #f97316; font-size: 10px; font-weight: 600; margin-top: 2px;">⏱ ${arrivalText}</div>`;
-      }
-
-      box.innerHTML = `${headerHtml}${locationHtml}${hazardHtml}${motionHtml}${arrivalHtml}`;
+      label.appendChild(dotEl);
+      label.appendChild(nameEl);
 
       const marker = new Marker({
-        element: box,
+        element: label,
         anchor: 'left',
-        offset: [14, 0]
+        offset: [12, 0]
       })
       .setLngLat([lon, lat])
       .addTo(map);
 
       stormInfoMarkersRef.current.push(marker);
     });
-  }, [mapLoaded, storms, dwrFrameData, selectedStorm, selectedHazard, hazards, arrival, stormState, visibleLayers.storms, onSelectStorm]);
+  }, [mapLoaded, storms, dwrFrameData, selectedStorm, visibleLayers.storms, onSelectStorm]);
 
   // ── 7b. Update Real INSAT Raster Image ──────────────────────────────────
   const insatObj = dwrFrameData?.insat_frame || stormState?.sensor_data?.satellite;
   const insatUri = insatObj?.image_data_uri;
   const insatBounds = insatObj?.bounds;
+  const insatObsTs = insatObj?.obs_timestamp;
+  const insatFile = insatObj?.filename;
+  const insatDeltaT = insatObj?.time_difference_minutes;
+
   useEffect(() => {
     if (!mapLoaded || !mapRef.current || !insatUri) return;
     const map = mapRef.current;
@@ -774,8 +709,17 @@ export default function GisMap({
           [minLon, minLat]
         ]
       });
+      map.triggerRepaint();
+
+      console.log(
+        `[GIS-MAP INSAT UPDATE] DWR: ${dwrFrameData?.timestamp || 'N/A'} ` +
+        `-> Selected File: ${insatFile || 'N/A'} ` +
+        `-> Obs: ${insatObsTs || 'N/A'} ` +
+        `-> Δt: ${insatDeltaT != null ? insatDeltaT : 'N/A'}m ` +
+        `-> Raster Layer Updated`
+      );
     }
-  }, [mapLoaded, insatUri, insatBounds]);
+  }, [mapLoaded, insatUri, insatBounds, insatObsTs, insatFile, insatDeltaT, dwrFrameData?.timestamp]);
 
   // ── 7c. Update Optical Flow Motion Vectors ────────────────────────────────
   useEffect(() => {

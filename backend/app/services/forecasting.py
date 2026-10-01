@@ -39,6 +39,7 @@ from backend.app.models.uncertainty import uncertainty_engine
 from backend.app.services.hazards import hazard_service
 from backend.app.services.risk import risk_engine
 from backend.app.services.arrival import arrival_engine
+from backend.app.services.geocoding import reverse_geocode_osm
 
 class ForecastingPipeline:
     def __init__(self):
@@ -118,6 +119,9 @@ class ForecastingPipeline:
                 dense_flow, storm, curr_frame["convective_intensity"].shape
             )
             storm["motion"] = motion
+            c_lat = storm.get("centroid", {}).get("lat")
+            c_lon = storm.get("centroid", {}).get("lon")
+            storm["location_name"] = reverse_geocode_osm(c_lat, c_lon) if c_lat is not None and c_lon is not None else "UNAVAILABLE"
 
         # 8. Forecasting Engine (Persistence / Optical Flow / ConvGRU Residual)
         if model_override == "PERSISTENCE":

@@ -26,7 +26,7 @@ class SatelliteService:
         files = []
         for sdir in search_dirs:
             if os.path.exists(sdir):
-                files.extend(glob.glob(os.path.join(sdir, "*.h5")))
+                files.extend(glob.glob(os.path.join(sdir, "**", "*.h5"), recursive=True))
 
         self._file_index = []
         seen_timestamps = set()
@@ -46,6 +46,12 @@ class SatelliteService:
             seen_timestamps.add(iso_time)
 
             sat_name = "INSAT-3DR" if fname.startswith("3RIMG") else "INSAT-3D"
+            is_sgp = "_L1C_SGP" in fname
+            if is_sgp:
+                file_bounds = {"min_lat": 6.5, "max_lat": 25.0, "min_lon": 73.0, "max_lon": 94.0}
+            else:
+                file_bounds = {"min_lat": 10.06, "max_lat": 24.01, "min_lon": 79.99, "max_lon": 93.94}
+
             self._file_index.append({
                 "filename": fname,
                 "filepath": fpath,
@@ -55,7 +61,9 @@ class SatelliteService:
                 "channel": "TIR1",
                 "resolution_km": 3.7,
                 "availability": True,
-                "quality_flag": "NOMINAL"
+                "quality_flag": "NOMINAL",
+                "is_sgp": is_sgp,
+                "bounds": file_bounds
             })
         self._file_index.sort(key=lambda x: x["timestamp"])
 
@@ -67,43 +75,49 @@ class SatelliteService:
         base_time = datetime.datetime(2019, 11, 7, 3, 0)
         return [(base_time + datetime.timedelta(minutes=10 * i)).strftime("%Y-%m-%dT%H:%M:%SZ") for i in range(15)]
 
-    def get_frame_info(self, timestamp: str) -> Optional[Dict[str, Any]]:
+    def get_frame_info(self, timestamp: str, target_location: Optional[Tuple[float, float]] = None) -> Optional[Dict[str, Any]]:
         if not self._file_index:
             return None
-        # 1. Exact match
-        for item in self._file_index:
-            if item["timestamp"] == timestamp:
-                return item
 
-        # 2. Match nearest real half-hourly INSAT observation for 10-min timeline
-        # Rule (Requirement 5):
-        # 03:00, 03:10, 03:20 -> 03:00
-        # 03:30, 03:40, 03:50 -> 03:30
-        # 04:00, 04:10, 04:20 -> 04:00
-        # 04:30, 04:40, 04:50 -> 04:30
-        # 05:00, 05:10, 05:20 -> 05:00
+        # Filter candidate files by geographic coverage if a target location (lat, lon) is provided
+        covering_files = self._file_index
+        if target_location:
+            t_lat, t_lon = target_location
+            covering = [
+                item for item in self._file_index
+                if item.get("bounds", {}).get("min_lat", 90) <= t_lat <= item.get("bounds", {}).get("max_lat", -90)
+                and item.get("bounds", {}).get("min_lon", 180) <= t_lon <= item.get("bounds", {}).get("max_lon", -180)
+            ]
+            if covering:
+                covering_files = covering
+
         try:
             req_dt = datetime.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-            prior_match = None
-            for item in reversed(self._file_index):
-                item_dt = datetime.datetime.fromisoformat(item["timestamp"].replace("Z", "+00:00"))
-                diff = (req_dt - item_dt).total_seconds()
-                if 0 <= diff < 1800:
-                    prior_match = item
-                    break
-            if prior_match:
-                return prior_match
 
-            # Fallback to closest overall in time
+            # 1. Match within +/-30 minutes (1800s) from covering files, picking nearest in time
+            candidates = []
+            for item in covering_files:
+                try:
+                    item_dt = datetime.datetime.fromisoformat(item["timestamp"].replace("Z", "+00:00"))
+                    diff_sec = abs((req_dt - item_dt).total_seconds())
+                    if diff_sec <= 1800:
+                        candidates.append((diff_sec, item))
+                except Exception:
+                    pass
+            if candidates:
+                candidates.sort(key=lambda x: x[0])
+                return candidates[0][1]
+
+            # 2. Fallback to closest overall in time
             closest = min(
-                self._file_index,
+                covering_files,
                 key=lambda it: abs((req_dt - datetime.datetime.fromisoformat(it["timestamp"].replace("Z", "+00:00"))).total_seconds())
             )
             return closest
         except Exception:
-            return self._file_index[0]
+            return covering_files[0]
 
-    def read_frame(self, timestamp: str) -> Dict[str, Any]:
+    def read_frame(self, timestamp: str, target_location: Optional[Tuple[float, float]] = None) -> Dict[str, Any]:
         """
         Read real INSAT-3D / INSAT-3DR HDF5 file:
         - Supports both pre-processed regional grids and official ISRO/MOSDAC Level-1C SGP files.
@@ -116,10 +130,11 @@ class SatelliteService:
         import cv2
         import base64
 
-        if timestamp in self._cache:
-            return copy.deepcopy(self._cache[timestamp])
+        cache_key = f"{timestamp}_{target_location[0]:.2f}_{target_location[1]:.2f}" if target_location else timestamp
+        if cache_key in self._cache:
+            return copy.deepcopy(self._cache[cache_key])
 
-        info = self.get_frame_info(timestamp)
+        info = self.get_frame_info(timestamp, target_location=target_location)
         if not info:
             if self._file_index:
                 info = self._file_index[0]
@@ -161,9 +176,10 @@ class SatelliteService:
                 lons_all = lon_0 + np.degrees(x / R)
                 lats_all = np.degrees(2.0 * np.arctan(np.exp(y / R)) - np.pi / 2.0)
 
-                # Regional slice: 10.06 to 24.01 N, 79.99 to 93.94 E
-                y_idx = np.where((lats_all >= 10.06) & (lats_all <= 24.01))[0]
-                x_idx = np.where((lons_all >= 79.99) & (lons_all <= 93.94))[0]
+                # Peninsular Indian domain covering TERLS Kerala and Indian landmass:
+                # 6.5 to 25.0 N, 73.0 to 94.0 E (contains TERLS storm at 8.85 N, 76.82 E)
+                y_idx = np.where((lats_all >= 6.5) & (lats_all <= 25.0))[0]
+                x_idx = np.where((lons_all >= 73.0) & (lons_all <= 94.0))[0]
 
                 if len(y_idx) > 0 and len(x_idx) > 0:
                     y_start, y_end = y_idx[0], y_idx[-1] + 1
@@ -241,7 +257,7 @@ class SatelliteService:
         }
 
         # Cache to speed up interactive dashboard replay
-        self._cache[timestamp] = result
+        self._cache[cache_key] = result
         return result
 
     def get_sequence(self, current_timestamp: str, num_past_frames: int = 3) -> List[Dict[str, Any]]:

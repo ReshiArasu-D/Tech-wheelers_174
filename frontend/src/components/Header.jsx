@@ -281,6 +281,30 @@ export default function Header({
           <span>Data Sources</span>
         </button>
 
+        {/* AI Copilot — prominent visible entry point */}
+        <button
+          onClick={onOpenChatDrawer}
+          title="AI Nowcast Copilot"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            background: 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)',
+            border: '1px solid #7C3AED',
+            borderRadius: '6px',
+            padding: '5px 11px',
+            fontSize: '0.73rem',
+            fontWeight: 700,
+            color: '#FFFFFF',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(124,58,237,0.25)',
+            letterSpacing: '0.01em'
+          }}
+        >
+          <Bot size={13} />
+          <span>AI Copilot</span>
+        </button>
+
         {/* Notification Bell */}
         <button
           onClick={onOpenAlertModal}

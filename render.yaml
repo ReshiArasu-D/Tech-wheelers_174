@@ -1,21 +1,8 @@
 services:
-  # 1. Backend Web Service (FastAPI + PyTorch CPU)
+  # Render = FRONTEND ONLY (https://now-casr.onrender.com)
+  # Backend is completely removed from Render and hosted on Vercel
   - type: web
-    name: co-nowcast-backend
-    env: python
-    region: singapore
-    plan: free
-    buildCommand: "pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt"
-    startCommand: "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.9
-      - key: ENVIRONMENT
-        value: production
-
-  # 2. Frontend Static Site (React Vite)
-  - type: web
-    name: co-nowcast-frontend
+    name: now-casr
     env: static
     region: singapore
     plan: free
@@ -28,8 +15,6 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://now-casr.onrender.com
-      - key: VITE_WS_URL
-        value: wss://now-casr.onrender.com/ws/live
+        value: https://co-nowcasr.vercel.app
       - key: VITE_MAPTILER_API_KEY
         value: ehLkmAaIGPEMafg5WhXy

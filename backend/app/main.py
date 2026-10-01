@@ -47,10 +47,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Enable CORS for React frontend (both local Vite/React and deployed cloud URLs)
+# Enable CORS for React frontend (Vercel deployments, Render, and local dev)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.onrender\.com|http://localhost:.*|http://127\.0\.0\.1:.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

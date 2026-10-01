@@ -1,0 +1,45 @@
+# Huge zip files and raw caches (Prevents 8.5 GB build context overflow on Render)
+*.zip
+insat_data.zip
+backend/data/insat/3RIMG_L1C_SGP/
+backend/data/insat/logs/
+dwr_unzipped/
+
+# Notebooks and training artifacts
+CO_NOWCAST_ConvGRU_Training.ipynb
+notebooks/
+notebook_analysis.txt
+training_summary.txt
+
+# Node & Frontend build caches
+node_modules/
+frontend/node_modules/
+.vite/
+
+# Git and IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Python caches and testing
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+backend/tests/
+
+# Scratch & Analysis scripts
+audit_*.py
+capture_*.py
+capture_*.cjs
+examine_*.py
+find_*.py
+inspect_*.py
+scan_*.py
+test_six_hazards.py
+test_timeline_hazards.py
+run_verification_suite.py
+scratch/
+screenshot_*.png
+*.png
