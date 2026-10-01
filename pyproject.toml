@@ -1,5 +1,5 @@
-[tool.vercel]
-entrypoint = "main.py:app"
-
 [tool.fastapi]
-entrypoint = "main:app"
+entrypoint = "backend.app.main:app"
+
+[tool.vercel]
+entrypoint = "backend.app.main:app"
