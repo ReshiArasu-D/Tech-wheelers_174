@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Maximize2, X } from 'lucide-react';
+import { Maximize2, X, ChevronDown, ChevronUp, Activity } from 'lucide-react';
 
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -28,25 +28,24 @@ function PanelCard({ title, badge, badgeColor, rightLabel, footer, onExpand, chi
     <div
       onClick={onExpand}
       title={onExpand ? "Click to expand visualization" : undefined}
+      className="box-card"
       style={{
-        background:'#FFFFFF', border:'1px solid #E2E8F0', borderRadius:'8px',
-        padding:'8px 10px', display:'flex', flexDirection:'column',
+        background:'#FFFFFF', border:'1px solid #CBD5E1', borderRadius:'8px',
+        padding:'9px 11px', display:'flex', flexDirection:'column',
         justifyContent:'space-between', position:'relative',
-        overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.03)',
+        overflow:'hidden', boxShadow:'0 1px 3px rgba(15, 23, 42, 0.05)',
         cursor: onExpand ? 'pointer' : 'default',
-        transition: 'border-color 0.15s ease, box-shadow 0.15s ease'
+        transition: 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.18s ease, box-shadow 0.18s ease'
       }}
       onMouseEnter={(e) => {
-        if (onExpand) {
-          e.currentTarget.style.borderColor = '#93C5FD';
-          e.currentTarget.style.boxShadow = '0 3px 8px rgba(37, 99, 235, 0.12)';
-        }
+        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.borderColor = '#93C5FD';
+        e.currentTarget.style.boxShadow = '0 6px 16px -2px rgba(37, 99, 235, 0.14)';
       }}
       onMouseLeave={(e) => {
-        if (onExpand) {
-          e.currentTarget.style.borderColor = '#E2E8F0';
-          e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.03)';
-        }
+        e.currentTarget.style.transform = 'translateY(0px)';
+        e.currentTarget.style.borderColor = '#CBD5E1';
+        e.currentTarget.style.boxShadow = '0 1px 3px rgba(15, 23, 42, 0.05)';
       }}
     >
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
@@ -637,6 +636,7 @@ export default function ScientificPanels({
     : tsFormatted;
 
   const [expandedCard, setExpandedCard] = useState(null);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -687,60 +687,174 @@ export default function ScientificPanels({
 
   return (
     <>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '8px',
-        padding: '7px 16px',
-        background: '#F5F7FA',
-        borderTop: '1px solid #E2E8F0',
-        borderBottom: '1px solid #E2E8F0',
-        height: '190px',
-        flexShrink: 0
-      }}>
-        {/* 1. INSAT-3D IR (Real MOSDAC Observation Raster) */}
-        <PanelCard
-          title="INSAT-3D IR (°C)"
-          badge={cardsMeta.insat.badge}
-          badgeColor={cardsMeta.insat.badgeColor}
-          rightLabel={insatRightLabel}
-          onExpand={() => setExpandedCard('insat')}
-          footer={cardsMeta.insat.footer}
+      {isMinimized ? (
+        <div
+          style={{
+            height: '28px',
+            background: '#FFFFFF',
+            borderTop: '1px solid #E2E8F0',
+            borderBottom: '1px solid #E2E8F0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 16px',
+            flexShrink: 0,
+            boxShadow: '0 -1px 3px rgba(0, 0, 0, 0.02)',
+            zIndex: 10
+          }}
         >
-          <InsatPanel dwrFrameData={dwrFrameData} stormState={stormState} />
-        </PanelCard>
+          <div
+            onClick={() => setIsMinimized(false)}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+            title="Click to restore scientific diagnostic panels"
+          >
+            <Activity size={13} color="#2563EB" />
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#1E293B' }}>
+              Scientific Diagnostics & Cross-Sections
+            </span>
+            <span style={{
+              fontSize: '9.5px',
+              fontWeight: 600,
+              padding: '1px 6px',
+              borderRadius: '3px',
+              background: '#F1F5F9',
+              color: '#64748B',
+              border: '1px solid #E2E8F0'
+            }}>
+              INSAT-3D IR · DWR dBZ · Vertical Slice · Optical Flow (Minimized)
+            </span>
+          </div>
 
-        {/* 2. DWR Reflectivity (Real TERLS Radar Replay) */}
-        <PanelCard
-          title="DWR Reflectivity (dBZ)"
-          badge={badge}
-          rightLabel={tsFormatted}
-          onExpand={() => setExpandedCard('dwr')}
-          footer={<><span>TERLS C-Band (250 km)</span><span>ConvGRU · 30,369 params</span></>}
-        >
-          <DwrPanel dwrFrameData={dwrFrameData} stormState={stormState} isExpanded={false} />
-        </PanelCard>
+          <button
+            onClick={() => setIsMinimized(false)}
+            title="Expand Diagnostic Panels"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: '#EFF6FF',
+              border: '1px solid #BFDBFE',
+              borderRadius: '4px',
+              color: '#2563EB',
+              padding: '2px 8px',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            <ChevronUp size={13} />
+            <span>Show Diagnostics</span>
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%', flexShrink: 0, zIndex: 10 }}>
+          {/* Header strip with minimize toggle */}
+          <div style={{
+            height: '24px',
+            background: '#FFFFFF',
+            borderTop: '1px solid #E2E8F0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 16px',
+            flexShrink: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Multi-Sensor Scientific Diagnostics
+              </span>
+              <span style={{ fontSize: '9px', color: '#94A3B8' }}>
+                (INSAT-3D, DWR C-Band, Volumetric RHI, Optical Flow)
+              </span>
+            </div>
 
-        {/* 3. Vertical Cross-section (Real DWR Volumetric RHI Slice) */}
-        <PanelCard
-          title="Vertical Cross-section (DWR)"
-          rightLabel={topHeightLabel}
-          onExpand={() => setExpandedCard('cross_section')}
-          footer={<><span>Height (km) vs Distance (km)</span><span>Volumetric Scan Extent</span></>}
-        >
-          <CrossSection selectedStorm={effectiveStorm} dwrFrameData={dwrFrameData} />
-        </PanelCard>
+            <button
+              onClick={() => setIsMinimized(true)}
+              title="Minimize Diagnostic Panels to expand map view"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: '4px',
+                color: '#64748B',
+                padding: '1px 7px',
+                fontSize: '10px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#E2E8F0';
+                e.currentTarget.style.color = '#0F172A';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#F8FAFC';
+                e.currentTarget.style.color = '#64748B';
+              }}
+            >
+              <ChevronDown size={12} />
+              <span>Minimize</span>
+            </button>
+          </div>
 
-        {/* 4. Motion Vectors (Real Farneback Optical Flow) */}
-        <PanelCard
-          title="Motion Vectors (Optical Flow)"
-          rightLabel="Speed (km/h)"
-          onExpand={() => setExpandedCard('motion')}
-          footer={<><span>Centroid · {motionLabel}</span><span>Farneback Optical Flow</span></>}
-        >
-          <MotionPanel dwrFrameData={dwrFrameData} stormState={stormState} />
-        </PanelCard>
-      </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '8px',
+            padding: '4px 16px 7px 16px',
+            background: '#F5F7FA',
+            borderTop: '1px solid #E2E8F0',
+            borderBottom: '1px solid #E2E8F0',
+            height: '185px',
+            flexShrink: 0
+          }}>
+            {/* 1. INSAT-3D IR (Real MOSDAC Observation Raster) */}
+            <PanelCard
+              title="INSAT-3D IR (°C)"
+              badge={cardsMeta.insat.badge}
+              badgeColor={cardsMeta.insat.badgeColor}
+              rightLabel={insatRightLabel}
+              onExpand={() => setExpandedCard('insat')}
+              footer={cardsMeta.insat.footer}
+            >
+              <InsatPanel dwrFrameData={dwrFrameData} stormState={stormState} />
+            </PanelCard>
+
+            {/* 2. DWR Reflectivity (Real TERLS Radar Replay) */}
+            <PanelCard
+              title="DWR Reflectivity (dBZ)"
+              badge={badge}
+              rightLabel={tsFormatted}
+              onExpand={() => setExpandedCard('dwr')}
+              footer={<><span>TERLS C-Band (250 km)</span><span>ConvGRU · 30,369 params</span></>}
+            >
+              <DwrPanel dwrFrameData={dwrFrameData} stormState={stormState} isExpanded={false} />
+            </PanelCard>
+
+            {/* 3. Vertical Cross-section (Real DWR Volumetric RHI Slice) */}
+            <PanelCard
+              title="Vertical Cross-section (DWR)"
+              rightLabel={topHeightLabel}
+              onExpand={() => setExpandedCard('cross_section')}
+              footer={<><span>Height (km) vs Distance (km)</span><span>Volumetric Scan Extent</span></>}
+            >
+              <CrossSection selectedStorm={effectiveStorm} dwrFrameData={dwrFrameData} />
+            </PanelCard>
+
+            {/* 4. Motion Vectors (Real Farneback Optical Flow) */}
+            <PanelCard
+              title="Motion Vectors (Optical Flow)"
+              rightLabel="Speed (km/h)"
+              onExpand={() => setExpandedCard('motion')}
+              footer={<><span>Centroid · {motionLabel}</span><span>Farneback Optical Flow</span></>}
+            >
+              <MotionPanel dwrFrameData={dwrFrameData} stormState={stormState} />
+            </PanelCard>
+          </div>
+        </div>
+      )}
 
       {/* Expanded Focused Viewer Modal */}
       {activeExpanded && (

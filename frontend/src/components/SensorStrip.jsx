@@ -144,46 +144,35 @@ export default function SensorStrip({
             key={s.id}
             onClick={() => onToggleSensor?.(s.id)}
             title={`Sensor: ${s.name} | Status: ${s.status} | Time: ${s.timestamp}`}
+            className="box-card-interactive"
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              padding: '4px 10px',
-              borderRadius: '7px',
+              gap: '9px',
+              padding: '5px 12px',
+              borderRadius: '8px',
               background: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+              border: '1px solid #CBD5E1',
+              flexShrink: 0
             }}
           >
-            {/* Icon */}
-            <div style={{
-              width: '24px',
-              height: '24px',
-              borderRadius: '5px',
-              background: '#EFF6FF',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#2563EB',
-              flexShrink: 0
-            }}>
-              <Icon size={14} />
+            {/* Icon Box */}
+            <div className="box-icon-container">
+              <Icon size={14} strokeWidth={2.2} />
             </div>
 
             {/* Label + Badge + Timestamp */}
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#0F172A' }}>
+                <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.01em' }}>
                   {s.name}
                 </span>
                 <span style={{
-                  fontSize: '8px',
+                  fontSize: '8.5px',
                   fontWeight: 800,
                   letterSpacing: '0.04em',
-                  padding: '1px 5px',
-                  borderRadius: '3px',
+                  padding: '1.5px 6px',
+                  borderRadius: '4px',
                   background: badge.bg,
                   border: `1px solid ${badge.border}`,
                   color: badge.color
@@ -191,7 +180,7 @@ export default function SensorStrip({
                   {s.status}
                 </span>
               </div>
-              <span style={{ fontSize: '9px', color: '#64748B', fontFamily: 'monospace' }}>
+              <span style={{ fontSize: '9.5px', color: '#64748B', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>
                 {s.timestamp}
               </span>
             </div>

@@ -55,3 +55,8 @@ desktop.ini
 scratch/
 carto_*.png
 esri_*.png
+test_*.png
+test_*.cjs
+generate_*.cjs
+evidence/
+SCREENSHOT_EVIDENCE_MANIFEST.txt

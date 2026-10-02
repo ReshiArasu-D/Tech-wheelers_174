@@ -4,7 +4,9 @@ import {
   Pause, 
   SkipBack, 
   SkipForward, 
-  Radio
+  Radio,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 export default function TimelineControl({
@@ -14,11 +16,16 @@ export default function TimelineControl({
   onSelectTimestamp,
   isLive = false,
   onToggleLive,
-  isLoading = false
+  isLoading = false,
+  isPlaying: propIsPlaying,
+  setIsPlaying: propSetIsPlaying
 }) {
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [internalIsPlaying, setInternalIsPlaying] = useState(false);
+  const isPlaying = propIsPlaying !== undefined ? propIsPlaying : internalIsPlaying;
+  const setIsPlaying = propSetIsPlaying || setInternalIsPlaying;
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [autoUpdate, setAutoUpdate] = useState(false);
+  const [showThumbnails, setShowThumbnails] = useState(true);
 
   const currentIndex = Math.max(0, timestamps.indexOf(currentTimestamp));
 
@@ -85,19 +92,18 @@ export default function TimelineControl({
           <button
             onClick={() => setIsPlaying(!isPlaying)}
             title={isPlaying ? 'Pause Replay' : 'Play Replay'}
+            className="box-btn"
             style={{
-              width: '30px',
-              height: '30px',
+              width: '32px',
+              height: '32px',
               borderRadius: '50%',
               background: '#2563EB',
-              border: 'none',
+              border: '1px solid #1D4ED8',
               color: '#FFFFFF',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(37, 99, 235, 0.25)',
-              transition: 'all 0.15s ease'
+              boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)'
             }}
           >
             {isPlaying ? <Pause size={13} fill="#FFFFFF" /> : <Play size={13} fill="#FFFFFF" style={{ marginLeft: '2px' }} />}
@@ -106,60 +112,60 @@ export default function TimelineControl({
           <button
             onClick={handleStepBack}
             title="Step Back 10 min"
+            className="box-btn"
             style={{
-              background: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              borderRadius: '5px',
+              padding: '6px',
               color: '#475569',
-              padding: '5px',
-              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}
           >
-            <SkipBack size={12} />
+            <SkipBack size={13} strokeWidth={2.2} />
           </button>
 
           <button
             onClick={handleStepForward}
             title="Step Forward 10 min"
+            className="box-btn"
             style={{
-              background: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              borderRadius: '5px',
+              padding: '6px',
               color: '#475569',
-              padding: '5px',
-              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}
           >
-            <SkipForward size={12} />
+            <SkipForward size={13} strokeWidth={2.2} />
           </button>
 
           {/* Speed selectors */}
-          <div style={{
-            display: 'flex',
-            background: '#F1F5F9',
-            borderRadius: '5px',
-            border: '1px solid #E2E8F0',
-            overflow: 'hidden',
-            marginLeft: '4px'
-          }}>
+          <div 
+            className="box-card"
+            style={{
+              display: 'flex',
+              background: '#F8FAFC',
+              borderRadius: '6px',
+              border: '1px solid #CBD5E1',
+              overflow: 'hidden',
+              marginLeft: '4px',
+              padding: '1px'
+            }}
+          >
             {speeds.map(s => (
               <button
                 key={s}
                 onClick={() => setPlaybackSpeed(s)}
                 style={{
                   background: playbackSpeed === s ? '#2563EB' : 'transparent',
-                  color: playbackSpeed === s ? '#FFFFFF' : '#64748B',
+                  color: playbackSpeed === s ? '#FFFFFF' : '#475569',
                   border: 'none',
+                  borderRadius: '4px',
                   fontSize: '9.5px',
                   fontWeight: 700,
-                  padding: '3px 7px',
-                  cursor: 'pointer'
+                  padding: '3px 8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
                 }}
               >
                 {s}x
@@ -254,34 +260,56 @@ export default function TimelineControl({
           {/* Go To Live button */}
           <button
             onClick={onToggleLive}
+            className="box-btn"
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '5px',
-              padding: '4px 10px',
-              borderRadius: '6px',
+              gap: '6px',
+              padding: '5px 12px',
+              borderRadius: '7px',
               background: isLive ? '#16A34A' : '#FFFFFF',
-              border: isLive ? '1px solid #16A34A' : '1px solid #CBD5E1',
-              color: isLive ? '#FFFFFF' : '#334155',
+              border: isLive ? '1px solid #15803D' : '1px solid #CBD5E1',
+              color: isLive ? '#FFFFFF' : '#1E293B',
               fontSize: '11px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
+              fontWeight: 700
             }}
           >
-            <Radio size={13} color={isLive ? '#FFFFFF' : '#2563EB'} />
+            <Radio size={13} color={isLive ? '#FFFFFF' : '#2563EB'} strokeWidth={2.2} />
             <span>{isLive ? 'In Live Mode' : 'Go To Live'}</span>
+          </button>
+
+          {/* Minimize/Expand Filmstrip Thumbnails */}
+          <button
+            onClick={() => setShowThumbnails(!showThumbnails)}
+            title={showThumbnails ? 'Minimize radar thumbnail filmstrip' : 'Show radar thumbnail filmstrip'}
+            className="box-btn"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '5px 10px',
+              borderRadius: '7px',
+              background: showThumbnails ? '#F8FAFC' : '#EFF6FF',
+              border: '1px solid #CBD5E1',
+              color: showThumbnails ? '#64748B' : '#2563EB',
+              fontSize: '10.5px',
+              fontWeight: 700
+            }}
+          >
+            {showThumbnails ? <ChevronDown size={12} strokeWidth={2.2} /> : <ChevronUp size={12} strokeWidth={2.2} />}
+            <span>Filmstrip</span>
           </button>
         </div>
       </div>
 
       {/* Bottom row: Thumbnail frames for radar sequences */}
+      {showThumbnails && (
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '6px',
+        gap: '7px',
         overflowX: 'auto',
-        padding: '2px 0',
+        padding: '3px 0 2px 0',
         whiteSpace: 'nowrap'
       }}>
         {timestamps.map((ts, idx) => {
@@ -291,32 +319,31 @@ export default function TimelineControl({
               key={ts}
               id={`timeline-frame-${idx}`}
               onClick={() => onSelectTimestamp(ts)}
+              className="box-card-interactive"
               style={{
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '2px',
-                padding: '2px 4px',
-                borderRadius: '5px',
+                gap: '3px',
+                padding: '3px 6px',
+                borderRadius: '7px',
                 background: isSelected ? '#EFF6FF' : '#FFFFFF',
-                border: isSelected ? '1.5px solid #2563EB' : '1px solid #E2E8F0',
-                cursor: 'pointer',
-                minWidth: '58px',
-                transition: 'all 0.15s ease'
+                border: isSelected ? '1.5px solid #2563EB' : '1px solid #CBD5E1',
+                minWidth: '60px',
+                boxShadow: isSelected ? '0 2px 8px rgba(37,99,235,0.18)' : '0 1px 2px rgba(15,23,42,0.04)'
               }}
             >
               {/* Mini radar thumbnail preview */}
               <div style={{
-                width: '46px',
-                height: '22px',
-                borderRadius: '3px',
+                width: '48px',
+                height: '24px',
+                borderRadius: '4px',
                 overflow: 'hidden',
                 backgroundColor: '#0F172A',
-                border: isSelected ? '1.5px solid #2563EB' : '1px solid rgba(0,0,0,0.12)',
+                border: isSelected ? '1.5px solid #2563EB' : '1px solid #CBD5E1',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: isSelected ? '0 0 0 2px rgba(37,99,235,0.2)' : 'none'
+                justifyContent: 'center'
               }}>
                 {thumbnails && thumbnails[idx] ? (
                   <img
@@ -341,7 +368,7 @@ export default function TimelineControl({
               </div>
               <span style={{
                 fontSize: '8.5px',
-                fontFamily: 'monospace',
+                fontFamily: 'var(--font-mono)',
                 fontWeight: isSelected ? 800 : 600,
                 color: isSelected ? '#2563EB' : '#64748B'
               }}>
@@ -351,6 +378,7 @@ export default function TimelineControl({
           );
         })}
       </div>
+      )}
     </div>
   );
 }

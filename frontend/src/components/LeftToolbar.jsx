@@ -64,16 +64,19 @@ export default function LeftToolbar({
       gap: '8px'
     }}>
       {/* Compact Tool Button Rail */}
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px',
-        background: '#FFFFFF',
-        border: '1px solid #E2E8F0',
-        borderRadius: '8px',
-        padding: '5px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)'
-      }}>
+      <div 
+        className="box-card"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '5px',
+          background: '#FFFFFF',
+          border: '1px solid #CBD5E1',
+          borderRadius: '9px',
+          padding: '6px',
+          boxShadow: '0 4px 16px rgba(15, 23, 42, 0.08)'
+        }}
+      >
         {tools.map(tool => {
           const Icon = tool.icon;
           const isSelected = tool.active;
@@ -83,6 +86,7 @@ export default function LeftToolbar({
               key={tool.id}
               onClick={tool.onClick}
               title={tool.label}
+              className="box-btn"
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -90,30 +94,18 @@ export default function LeftToolbar({
                 justifyContent: 'center',
                 width: '46px',
                 height: '46px',
-                borderRadius: '6px',
-                background: isPrimary3D ? '#2563EB' : (isSelected ? '#EFF6FF' : 'transparent'),
-                border: isPrimary3D ? 'none' : (isSelected ? '1px solid #BFDBFE' : '1px solid transparent'),
+                borderRadius: '7px',
+                background: isPrimary3D ? '#2563EB' : (isSelected ? '#EFF6FF' : '#FFFFFF'),
+                border: isPrimary3D ? '1px solid #1D4ED8' : (isSelected ? '1.5px solid #3B82F6' : '1px solid #E2E8F0'),
                 color: isPrimary3D ? '#FFFFFF' : (isSelected ? '#2563EB' : '#475569'),
                 cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-              onMouseEnter={(e) => {
-                if (!isSelected && !isPrimary3D) {
-                  e.currentTarget.style.background = '#F1F5F9';
-                  e.currentTarget.style.color = '#0F172A';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isSelected && !isPrimary3D) {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = '#475569';
-                }
+                boxShadow: isPrimary3D ? '0 2px 6px rgba(37, 99, 235, 0.3)' : (isSelected ? '0 2px 5px rgba(37,99,235,0.15)' : 'none')
               }}
             >
-              <Icon size={17} />
+              <Icon size={17} strokeWidth={2.2} />
               <span style={{ 
                 fontSize: '8px', 
-                fontWeight: 600, 
+                fontWeight: 700, 
                 marginTop: '3px', 
                 textAlign: 'center', 
                 letterSpacing: '-0.02em',

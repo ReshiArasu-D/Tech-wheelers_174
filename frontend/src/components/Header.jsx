@@ -28,10 +28,24 @@ export default function Header({
   dwrReplayInfo = null
 }) {
   const [currentClock, setCurrentClock] = useState(new Date());
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [regionMenuOpen, setRegionMenuOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentClock(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('.header-dropdown-container')) {
+        setModelMenuOpen(false);
+        setRegionMenuOpen(false);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
   }, []);
 
   // Format meteorological replay timestamp if in replay mode
@@ -125,9 +139,11 @@ export default function Header({
         display: 'flex',
         alignItems: 'center',
         background: '#F1F5F9',
-        border: '1px solid #E2E8F0',
-        borderRadius: '7px',
-        padding: '2px'
+        border: '1px solid #CBD5E1',
+        borderRadius: '8px',
+        padding: '3px',
+        gap: '2px',
+        boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.04)'
       }}>
         {navItems.map(item => {
           const isActive = (item.id === 'live' && mode === 'live') || 
@@ -144,19 +160,20 @@ export default function Header({
                   onOpenSummaryModal?.();
                 }
               }}
+              className="box-btn"
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
-                padding: '4px 14px',
-                borderRadius: '5px',
+                padding: '5px 14px',
+                borderRadius: '6px',
                 background: isActive ? '#2563EB' : 'transparent',
-                border: 'none',
+                border: isActive ? '1px solid #1D4ED8' : '1px solid transparent',
                 color: isActive ? '#FFFFFF' : '#475569',
-                fontWeight: isActive ? 600 : 500,
+                fontWeight: isActive ? 700 : 600,
                 fontSize: '0.78rem',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease'
+                boxShadow: isActive ? '0 2px 4px rgba(37, 99, 235, 0.25)' : 'none'
               }}
             >
               <span>{item.label}</span>
@@ -164,7 +181,7 @@ export default function Header({
                 <span style={{
                   fontSize: '9px',
                   fontWeight: 800,
-                  background: isActive ? '#DC2626' : '#DC2626',
+                  background: '#DC2626',
                   color: '#FFFFFF',
                   padding: '1px 5px',
                   borderRadius: '10px'
@@ -178,34 +195,40 @@ export default function Header({
       </div>
 
       {/* RIGHT: Timestamp + Model + Region + Data Sources + Bell + Avatar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {/* Real Backend / Meteorological Timestamp */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-end',
-          marginRight: '4px'
-        }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Real Backend / Meteorological Timestamp Box */}
+        <div 
+          className="box-card"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            padding: '3px 8px',
+            background: '#F8FAFC',
+            border: '1px solid #CBD5E1',
+            borderRadius: '6px'
+          }}
+        >
           <div style={{
-            fontSize: '0.80rem',
+            fontSize: '0.78rem',
             fontWeight: 700,
             color: '#0F172A',
-            fontFamily: 'monospace',
+            fontFamily: 'var(--font-mono)',
             letterSpacing: '-0.01em'
           }}>
             {formatDisplayTimestamp()}
           </div>
           <div style={{
-            fontSize: '0.66rem',
-            color: '#2563EB',
-            fontWeight: 600,
+            fontSize: '0.65rem',
+            color: mode === 'live' ? '#16A34A' : '#2563EB',
+            fontWeight: 700,
             display: 'flex',
             alignItems: 'center',
             gap: '4px'
           }}>
             <span style={{
-              width: '4px',
-              height: '4px',
+              width: '5px',
+              height: '5px',
               borderRadius: '50%',
               background: mode === 'live' ? '#16A34A' : '#2563EB'
             }} />
@@ -213,71 +236,198 @@ export default function Header({
           </div>
         </div>
 
-        {/* Model Selector */}
-        <select
-          value={selectedModel}
-          onChange={(e) => onSelectModel?.(e.target.value)}
-          style={{
-            background: '#FFFFFF',
-            border: '1px solid #CBD5E1',
-            borderRadius: '6px',
-            padding: '5px 8px',
-            fontSize: '0.73rem',
-            fontWeight: 600,
-            color: '#0F172A',
-            cursor: 'pointer',
-            outline: 'none',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-          }}
-        >
-          <option value="CONVGRU">Model: ConvGRU (Trained)</option>
-          <option value="OPTICAL_FLOW">Model: Optical Flow (TV-L1)</option>
-          <option value="PERSISTENCE">Model: Persistence Baseline</option>
-        </select>
+        {/* Model Custom Dropdown */}
+        <div className="header-dropdown-container" style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setModelMenuOpen(!modelMenuOpen);
+              setRegionMenuOpen(false);
+            }}
+            className="box-btn"
+            style={{
+              background: '#FFFFFF',
+              border: '1px solid #CBD5E1',
+              borderRadius: '7px',
+              padding: '6px 10px',
+              fontSize: '0.74rem',
+              fontWeight: 600,
+              color: '#0F172A',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <span>
+              {selectedModel === 'CONVGRU' ? 'Model: ConvGRU (Trained)' :
+               selectedModel === 'OPTICAL_FLOW' ? 'Model: Optical Flow (TV-L1)' :
+               'Model: Persistence Baseline'}
+            </span>
+            <ChevronDown size={13} color="#64748B" />
+          </button>
 
-        {/* Region Selector */}
-        <select
-          value={selectedRegion}
-          onChange={(e) => onSelectRegion?.(e.target.value)}
-          style={{
-            background: '#FFFFFF',
-            border: '1px solid #CBD5E1',
-            borderRadius: '6px',
-            padding: '5px 8px',
-            fontSize: '0.73rem',
-            fontWeight: 600,
-            color: '#0F172A',
-            cursor: 'pointer',
-            outline: 'none',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-          }}
-        >
-          <option value="TERLS">Region: Kerala (TERLS Radar)</option>
-          <option value="India">Region: India (National)</option>
-          <option value="Odisha">Region: Odisha / Bhubaneswar</option>
-          <option value="Bengal">Region: Bay of Bengal Convective</option>
-        </select>
+          {modelMenuOpen && (
+            <div
+              className="box-card"
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 4px)',
+                left: 0,
+                minWidth: '220px',
+                background: '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                borderRadius: '8px',
+                boxShadow: '0 10px 25px -4px rgba(15, 23, 42, 0.15)',
+                zIndex: 1000,
+                padding: '4px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px'
+              }}
+            >
+              {[
+                { value: 'CONVGRU', label: 'Model: ConvGRU (Trained)' },
+                { value: 'OPTICAL_FLOW', label: 'Model: Optical Flow (TV-L1)' },
+                { value: 'PERSISTENCE', label: 'Model: Persistence Baseline' }
+              ].map(opt => (
+                <div
+                  key={opt.value}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectModel?.(opt.value);
+                    setModelMenuOpen(false);
+                  }}
+                  style={{
+                    padding: '7px 10px',
+                    borderRadius: '5px',
+                    fontSize: '0.74rem',
+                    fontWeight: selectedModel === opt.value ? 700 : 500,
+                    background: selectedModel === opt.value ? '#EFF6FF' : 'transparent',
+                    color: selectedModel === opt.value ? '#2563EB' : '#0F172A',
+                    cursor: 'pointer',
+                    transition: 'background 0.12s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedModel !== opt.value) e.currentTarget.style.background = '#F8FAFC';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedModel !== opt.value) e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  {opt.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Region Custom Dropdown */}
+        <div className="header-dropdown-container" style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setRegionMenuOpen(!regionMenuOpen);
+              setModelMenuOpen(false);
+            }}
+            className="box-btn"
+            style={{
+              background: '#FFFFFF',
+              border: '1px solid #CBD5E1',
+              borderRadius: '7px',
+              padding: '6px 10px',
+              fontSize: '0.74rem',
+              fontWeight: 600,
+              color: '#0F172A',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <span>
+              {selectedRegion === 'TERLS' ? 'Region: Kerala (TERLS Radar)' :
+               selectedRegion === 'India' ? 'Region: India (National)' :
+               selectedRegion === 'Odisha' ? 'Region: Odisha / Bhubaneswar' :
+               'Region: Bay of Bengal Convective'}
+            </span>
+            <ChevronDown size={13} color="#64748B" />
+          </button>
+
+          {regionMenuOpen && (
+            <div
+              className="box-card"
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 4px)',
+                right: 0,
+                minWidth: '240px',
+                background: '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                borderRadius: '8px',
+                boxShadow: '0 10px 25px -4px rgba(15, 23, 42, 0.15)',
+                zIndex: 1000,
+                padding: '4px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px'
+              }}
+            >
+              {[
+                { value: 'TERLS', label: 'Region: Kerala (TERLS Radar)' },
+                { value: 'India', label: 'Region: India (National)' },
+                { value: 'Odisha', label: 'Region: Odisha / Bhubaneswar' },
+                { value: 'Bengal', label: 'Region: Bay of Bengal Convective' }
+              ].map(opt => (
+                <div
+                  key={opt.value}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectRegion?.(opt.value);
+                    setRegionMenuOpen(false);
+                  }}
+                  style={{
+                    padding: '7px 10px',
+                    borderRadius: '5px',
+                    fontSize: '0.74rem',
+                    fontWeight: selectedRegion === opt.value ? 700 : 500,
+                    background: selectedRegion === opt.value ? '#EFF6FF' : 'transparent',
+                    color: selectedRegion === opt.value ? '#2563EB' : '#0F172A',
+                    cursor: 'pointer',
+                    transition: 'background 0.12s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedRegion !== opt.value) e.currentTarget.style.background = '#F8FAFC';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedRegion !== opt.value) e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  {opt.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Data Sources Button */}
         <button
           onClick={onOpenDataSources}
           title="Data Sources & Provenance"
+          className="box-btn"
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            background: '#FFFFFF',
-            border: '1px solid #CBD5E1',
-            borderRadius: '6px',
-            padding: '5px 9px',
-            fontSize: '0.73rem',
+            padding: '6px 10px',
+            fontSize: '0.74rem',
             fontWeight: 600,
-            color: '#2563EB',
-            cursor: 'pointer',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+            color: '#2563EB'
           }}
         >
-          <Database size={13} />
+          <Database size={13} strokeWidth={2.2} />
           <span>Data Sources</span>
         </button>
 
@@ -285,23 +435,23 @@ export default function Header({
         <button
           onClick={onOpenChatDrawer}
           title="AI Nowcast Copilot"
+          className="box-btn"
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '5px',
+            gap: '6px',
             background: 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)',
-            border: '1px solid #7C3AED',
-            borderRadius: '6px',
-            padding: '5px 11px',
-            fontSize: '0.73rem',
+            border: '1px solid #6D28D9',
+            borderRadius: '7px',
+            padding: '6px 12px',
+            fontSize: '0.75rem',
             fontWeight: 700,
             color: '#FFFFFF',
-            cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(124,58,237,0.25)',
+            boxShadow: '0 2px 8px rgba(124,58,237,0.3)',
             letterSpacing: '0.01em'
           }}
         >
-          <Bot size={13} />
+          <Bot size={14} strokeWidth={2.2} />
           <span>AI Copilot</span>
         </button>
 
@@ -309,64 +459,39 @@ export default function Header({
         <button
           onClick={onOpenAlertModal}
           title="Alert Candidates"
+          className="box-btn"
           style={{
             position: 'relative',
-            background: '#FFFFFF',
-            border: '1px solid #CBD5E1',
-            borderRadius: '6px',
-            width: '30px',
-            height: '30px',
+            width: '32px',
+            height: '32px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#64748B',
-            cursor: 'pointer',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+            color: '#475569'
           }}
         >
-          <Bell size={15} />
+          <Bell size={15} strokeWidth={2.2} />
           {activeAlertCount > 0 && (
             <span style={{
               position: 'absolute',
               top: '-3px',
               right: '-3px',
-              width: '13px',
-              height: '13px',
+              width: '14px',
+              height: '14px',
               borderRadius: '50%',
               background: '#DC2626',
               color: '#FFFFFF',
-              fontSize: '8px',
+              fontSize: '8.5px',
               fontWeight: 800,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              boxShadow: '0 1px 3px rgba(220, 38, 38, 0.4)'
             }}>
               {activeAlertCount}
             </span>
           )}
         </button>
-
-        {/* User Profile Avatar (matching circle 'R' in reference) */}
-        <div 
-          onClick={onOpenChatDrawer}
-          title="Operator Profile / AI Assistant"
-          style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
-            background: '#2563EB',
-            color: '#FFFFFF',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.78rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '0 1px 3px rgba(37, 99, 235, 0.3)'
-          }}
-        >
-          R
-        </div>
       </div>
     </header>
   );

@@ -14,6 +14,7 @@ import AiSummaryModal from './components/AiSummaryModal';
 import AiChatDrawer from './components/AiChatDrawer';
 import LandingModal from './components/LandingModal';
 
+import { ChevronLeft } from 'lucide-react';
 import { api } from './services/api';
 
 export default function App() {
@@ -56,6 +57,7 @@ export default function App() {
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [isChatDrawerOpen, setIsChatDrawerOpen] = useState(false);
   const [isLandingOpen, setIsLandingOpen] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
 
 
   // Real DWR Historical Replay State (03:00 to 05:20 UTC)
@@ -377,7 +379,7 @@ export default function App() {
 
 
         {/* RIGHT STORM PANEL (SCROLLABLE, REAL BACKEND TELEMETRY) */}
-        {isRightPanelOpen && (
+        {isRightPanelOpen ? (
           <RightStormPanel
             selectedStorm={selectedStorm}
             storms={displayStorms}
@@ -394,6 +396,57 @@ export default function App() {
             currentTimestamp={currentTimestamp}
             onClose={() => setIsRightPanelOpen(false)}
           />
+        ) : (
+          /* Floating Tab to Expand / Open Right Storm Panel */
+          <button
+            onClick={() => setIsRightPanelOpen(true)}
+            title="Open Storm Cell Telemetry & Hazards Panel"
+            style={{
+              position: 'absolute',
+              top: '16px',
+              right: 0,
+              zIndex: 35,
+              background: '#FFFFFF',
+              border: '1px solid #CBD5E1',
+              borderRight: 'none',
+              borderRadius: '8px 0 0 8px',
+              boxShadow: '-4px 2px 14px rgba(0, 0, 0, 0.12)',
+              padding: '8px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '7px',
+              cursor: 'pointer',
+              color: '#0F172A',
+              fontWeight: 700,
+              fontSize: '0.78rem',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#F8FAFC';
+              e.currentTarget.style.boxShadow = '-6px 4px 18px rgba(37, 99, 235, 0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#FFFFFF';
+              e.currentTarget.style.boxShadow = '-4px 2px 14px rgba(0, 0, 0, 0.12)';
+            }}
+          >
+            <ChevronLeft size={16} color="#2563EB" />
+            <span>Storm Details</span>
+            {selectedStorm?.max_dbz != null && (
+              <span style={{
+                background: '#EFF6FF',
+                color: '#2563EB',
+                border: '1px solid #BFDBFE',
+                borderRadius: '4px',
+                padding: '1px 5px',
+                fontSize: '0.7rem',
+                fontFamily: 'monospace',
+                fontWeight: 800
+              }}>
+                {selectedStorm.max_dbz} dBZ
+              </span>
+            )}
+          </button>
         )}
       </div>
 
@@ -424,6 +477,8 @@ export default function App() {
         isLive={mode === 'live'}
         onToggleLive={handleGoToLive}
         isLoading={isLoading}
+        isPlaying={isPlaying}
+        setIsPlaying={setIsPlaying}
       />
 
       {/* MODALS */}
@@ -453,6 +508,10 @@ export default function App() {
         isOpen={isChatDrawerOpen}
         onClose={() => setIsChatDrawerOpen(false)}
         stormState={stormState}
+        selectedStorm={selectedStorm}
+        selectedHazard={selectedHazard}
+        dwrFrameData={dwrFrameData}
+        dwrReplayInfo={dwrReplayInfo}
         selectedHorizon={selectedHorizon}
         selectedModel={selectedModel}
         currentTimestamp={currentTimestamp}
@@ -463,6 +522,7 @@ export default function App() {
         onClose={() => setIsLandingOpen(false)}
         onStartReplay={() => {
           if (timestamps.length > 0) setCurrentTimestamp(timestamps[0]);
+          setIsPlaying(true);
           setIsLandingOpen(false);
         }}
       />

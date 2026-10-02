@@ -4,8 +4,15 @@ import React from 'react';
  * Renders formatted text supporting markdown bold (**text**), lists (* / - / 1.),
  * headers (###), inline code, and severity badges without displaying raw asterisks.
  */
-export default function FormattedText({ content, style = {} }) {
+export default function FormattedText({ content, style = {}, theme = 'light' }) {
   if (!content) return null;
+
+  const isDark = theme === 'dark';
+  const boldColor = isDark ? '#FFFFFF' : '#0F172A';
+  const accentColor = isDark ? '#38BDF8' : '#2563EB';
+  const codeBg = isDark ? 'rgba(56, 189, 248, 0.15)' : '#EFF6FF';
+  const codeColor = isDark ? '#38BDF8' : '#1D4ED8';
+  const codeBorder = isDark ? 'transparent' : '#BFDBFE';
 
   // Split into lines
   const lines = content.split('\n');
@@ -42,7 +49,7 @@ export default function FormattedText({ content, style = {} }) {
         // Bold content
         const boldText = boldMatch[1];
         parts.push(
-          <strong key={keyIdx++} style={{ fontWeight: 650, color: '#f1f5f9' }}>
+          <strong key={keyIdx++} style={{ fontWeight: 700, color: boldColor }}>
             {boldText}
           </strong>
         );
@@ -60,8 +67,9 @@ export default function FormattedText({ content, style = {} }) {
             style={{
               padding: '1px 5px',
               borderRadius: '4px',
-              background: 'rgba(56, 189, 248, 0.15)',
-              color: '#38bdf8',
+              background: codeBg,
+              color: codeColor,
+              border: `1px solid ${codeBorder}`,
               fontFamily: 'monospace',
               fontSize: '0.85em'
             }}
@@ -93,7 +101,7 @@ export default function FormattedText({ content, style = {} }) {
               style={{
                 fontSize: '0.88rem',
                 fontWeight: 750,
-                color: '#38bdf8',
+                color: accentColor,
                 marginTop: '4px',
                 marginBottom: '2px'
               }}
@@ -116,7 +124,7 @@ export default function FormattedText({ content, style = {} }) {
                 paddingLeft: '4px'
               }}
             >
-              <span style={{ color: '#38bdf8', fontSize: '0.9rem', lineHeight: '1.4' }}>•</span>
+              <span style={{ color: accentColor, fontSize: '0.9rem', lineHeight: '1.4' }}>•</span>
               <span style={{ flex: 1 }}>{renderInline(bulletContent)}</span>
             </div>
           );
@@ -135,7 +143,7 @@ export default function FormattedText({ content, style = {} }) {
                 paddingLeft: '4px'
               }}
             >
-              <span style={{ color: '#38bdf8', fontWeight: 600, fontSize: '0.8rem', minWidth: '16px' }}>
+              <span style={{ color: accentColor, fontWeight: 700, fontSize: '0.8rem', minWidth: '16px' }}>
                 {numMatch[1]}.
               </span>
               <span style={{ flex: 1 }}>{renderInline(numMatch[2])}</span>

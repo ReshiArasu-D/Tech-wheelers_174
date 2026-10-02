@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Bot
 } from 'lucide-react';
 import { api } from '../services/api';
@@ -228,22 +229,24 @@ export default function RightStormPanel({
   const headerBadge = getSeverityBadge(severity);
 
   return (
-    <div style={{
-      width: '420px',
-      height: '100%',
-      background: '#FFFFFF',
-      borderLeft: '1px solid #E2E8F0',
-      display: 'flex',
-      flexDirection: 'column',
-      zIndex: 25,
-      overflowY: 'auto',
-      overflowX: 'hidden',
-      flexShrink: 0,
-      boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.04)'
-    }}>
-      {/* 1. Header: Storm Cell #ID + Severity + Close */}
+    <div 
+      id="right-storm-panel-container"
+      style={{
+        width: '420px',
+        height: '100%',
+        background: '#FFFFFF',
+        borderLeft: '1px solid #E2E8F0',
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 25,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        flexShrink: 0,
+        boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.04)'
+      }}>
+      {/* 1. Header: Storm Cell #ID + Severity + Minimize/Close */}
       <div style={{
-        padding: '12px 16px',
+        padding: '10px 14px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -251,10 +254,11 @@ export default function RightStormPanel({
         background: '#FFFFFF',
         position: 'sticky',
         top: 0,
-        zIndex: 10
+        zIndex: 10,
+        gap: '8px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
             <select
               value={selectedStorm?.storm_id || ''}
               onChange={(e) => {
@@ -262,19 +266,22 @@ export default function RightStormPanel({
                 if (found && onSelectStorm) onSelectStorm(found);
               }}
               style={{
-                fontSize: '0.85rem',
-                fontWeight: 800,
+                fontSize: '0.82rem',
+                fontWeight: 700,
                 color: '#0F172A',
                 background: '#F8FAFC',
                 border: '1px solid #CBD5E1',
                 borderRadius: '6px',
-                padding: '5px 28px 5px 10px',
+                padding: '5px 24px 5px 8px',
                 cursor: 'pointer',
                 appearance: 'none',
                 WebkitAppearance: 'none',
                 MozAppearance: 'none',
                 outline: 'none',
-                minWidth: '220px'
+                width: '100%',
+                textOverflow: 'ellipsis',
+                overflow: 'hidden',
+                whiteSpace: 'nowrap'
               }}
             >
               {storms && storms.length > 0 ? (
@@ -287,7 +294,7 @@ export default function RightStormPanel({
                 <option value={stormId}>Storm Cell #{stormId}</option>
               )}
             </select>
-            <ChevronDown size={14} style={{ position: 'absolute', right: '8px', pointerEvents: 'none', color: '#64748B' }} />
+            <ChevronDown size={13} style={{ position: 'absolute', right: '8px', pointerEvents: 'none', color: '#64748B' }} />
           </div>
           <span style={{
             fontSize: '0.62rem',
@@ -297,25 +304,43 @@ export default function RightStormPanel({
             background: headerBadge.bg,
             border: `1px solid ${headerBadge.border}`,
             color: headerBadge.text,
-            letterSpacing: '0.04em'
+            letterSpacing: '0.04em',
+            flexShrink: 0
           }}>
             {severity}
           </span>
         </div>
 
-        <button
-          onClick={onClose}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#64748B',
-            cursor: 'pointer',
-            padding: '4px',
-            borderRadius: '4px'
-          }}
-        >
-          <X size={16} />
-        </button>
+        {/* Minimize / Close Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+          <button
+            onClick={onClose}
+            title="Minimize slide panel (Collapse to right)"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '28px',
+              height: '28px',
+              background: '#F1F5F9',
+              border: '1px solid #E2E8F0',
+              borderRadius: '6px',
+              color: '#475569',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#E2E8F0';
+              e.currentTarget.style.color = '#0F172A';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#F1F5F9';
+              e.currentTarget.style.color = '#475569';
+            }}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
       </div>
 
       {/* 2. Sub Tabs: Overview | Forecast | Vertical Profile | Raw Data */}
@@ -364,15 +389,17 @@ export default function RightStormPanel({
         {activeTab === 'overview' && (
           <>
             {/* Storm Cell Scope Preview + Key Telemetry */}
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              padding: '10px',
-              background: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              borderRadius: '8px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-            }}>
+            <div 
+              className="box-card"
+              style={{
+                display: 'flex',
+                gap: '12px',
+                padding: '12px',
+                background: '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                borderRadius: '8px'
+              }}
+            >
               {/* Radar Scope Thumbnail */}
               <div style={{
                 width: '100px',
@@ -391,7 +418,7 @@ export default function RightStormPanel({
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 ) : (
-                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', fontSize: '8px', fontFamily: 'monospace' }}>
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', fontSize: '8px', fontFamily: 'var(--font-mono)' }}>
                     SCANNING...
                   </div>
                 )}
@@ -424,7 +451,7 @@ export default function RightStormPanel({
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px', justifyContent: 'center' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem' }}>
                   <span style={{ color: '#64748B' }}>Location</span>
-                  <span style={{ color: '#0F172A', fontWeight: 700, fontFamily: 'monospace' }}>
+                  <span style={{ color: '#0F172A', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
                     {cLat != null && cLon != null ? `${cLat.toFixed(2)}°N, ${cLon.toFixed(2)}°E` : 'N/A'}
                   </span>
                 </div>
@@ -444,7 +471,7 @@ export default function RightStormPanel({
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem' }}>
                   <span style={{ color: '#64748B' }}>Arrival Countdown</span>
-                  <span style={{ color: '#0F172A', fontWeight: 700, fontFamily: 'monospace', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ color: '#0F172A', fontWeight: 700, fontFamily: 'var(--font-mono)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {arrivalCountdownDisplay}
                   </span>
                 </div>
@@ -476,24 +503,27 @@ export default function RightStormPanel({
             </div>
 
             {/* 3. MULTI-HAZARD ASSESSMENT (6 HEADS) */}
-            <div style={{
-              background: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              borderRadius: '8px',
-              padding: '10px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-            }}>
+            <div 
+              className="box-card"
+              style={{
+                background: '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                borderRadius: '8px',
+                padding: '11px',
+                boxShadow: '0 1px 3px rgba(15, 23, 42, 0.05)'
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0F172A' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0F172A' }}>
                   Multi-Hazard Assessment (6 Heads)
                 </span>
-                <span style={{ fontSize: '0.65rem', color: '#64748B' }}>
+                <span style={{ fontSize: '0.67rem', color: '#64748B', fontWeight: 500 }}>
                   Click to visualize on map
                 </span>
               </div>
 
               {/* 2 ROWS x 3 COLS GRID with sparklines */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '7px' }}>
                 {hazardDefinitions.map(hazard => {
                   const Icon = hazard.icon;
                   const isSelected = selectedHazard === hazard.id;
@@ -504,41 +534,51 @@ export default function RightStormPanel({
                       key={hazard.id}
                       id={`hazard-card-${hazard.id}`}
                       onClick={() => onSelectHazard?.(isSelected ? null : hazard.id)}
+                      className="box-card-interactive"
                       style={{
-                        padding: '7px 8px',
-                        borderRadius: '6px',
+                        padding: '8px 9px',
+                        borderRadius: '7px',
                         background: isSelected ? '#EFF6FF' : '#FFFFFF',
                         border: isSelected 
                           ? `1.5px solid ${hazard.color}` 
-                          : '1px solid #E2E8F0',
-                        boxShadow: isSelected ? '0 1px 4px rgba(37, 99, 235, 0.15)' : 'none',
-                        cursor: 'pointer',
+                          : '1px solid #CBD5E1',
+                        boxShadow: isSelected ? `0 2px 8px -1px ${hazard.color}33` : '0 1px 2px rgba(15, 23, 42, 0.04)',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '3px',
-                        transition: 'all 0.15s ease'
+                        gap: '3px'
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Icon size={13} color={isSelected ? hazard.color : '#64748B'} />
+                        <div style={{
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '4px',
+                          background: isSelected ? '#DBEAFE' : '#F1F5F9',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <Icon size={12} color={isSelected ? hazard.color : '#475569'} strokeWidth={2.2} />
+                        </div>
                         <span style={{
-                          fontSize: '7px',
+                          fontSize: '7.5px',
                           fontWeight: 800,
-                          padding: '1px 3px',
-                          borderRadius: '3px',
+                          padding: '1.5px 5px',
+                          borderRadius: '4px',
                           background: badge.bg,
-                          color: badge.text
+                          color: badge.text,
+                          border: `1px solid ${badge.border || 'transparent'}`
                         }}>
                           {hazard.data?.severity}
                         </span>
                       </div>
 
-                      <div style={{ fontSize: '0.67rem', fontWeight: isSelected ? 700 : 600, color: isSelected ? '#0F172A' : '#334155' }}>
+                      <div style={{ fontSize: '0.70rem', fontWeight: isSelected ? 800 : 700, color: isSelected ? '#0F172A' : '#1E293B', marginTop: '2px' }}>
                         {hazard.name}
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1px' }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: hazard.color, fontFamily: 'monospace' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
+                        <span style={{ fontSize: '0.80rem', fontWeight: 800, color: hazard.color, fontFamily: 'var(--font-mono)' }}>
                           {hazard.data?.probability !== null && hazard.data?.probability !== undefined ? `${Math.round(hazard.data.probability * 100)}%` : 'N/A'}
                         </span>
                         
